@@ -19,10 +19,10 @@ namespace MarsDSP::DSP
     }
 
     template<size_t maxNumModes, typename SampleType>
-    typename ModalFilterBank<maxNumModes, SampleType>::Vec ModalFilterBank<maxNumModes, SampleType>::tau2t60(
+    ModalFilterBank<maxNumModes, SampleType>::Vec ModalFilterBank<maxNumModes, SampleType>::tau2t60(
         Vec tau, SampleType originalSampleRate)
     {
-        return Vec((SampleType) 1) / (xsimd::log(xsimd::exp(originalSampleRate / tau)) / log1000);
+        return Vec(static_cast<SampleType>(1)) / (xsimd::log(xsimd::exp(originalSampleRate / tau)) / log1000);
     }
 
     template<size_t maxNumModes, typename SampleType>
@@ -50,10 +50,10 @@ namespace MarsDSP::DSP
     void ModalFilterBank<maxNumModes, SampleType>::updateAmplitudeNormalizationFactor(SampleType normalize)
     {
         auto lowestModeMag = std::abs(amplitudeData[0]);
-        if (normalize > (SampleType) 0 && lowestModeMag > (SampleType) 0)
+        if (normalize > static_cast<SampleType>(0) && lowestModeMag > static_cast<SampleType>(0))
             amplitudeNormalizationFactor = normalize / lowestModeMag;
         else
-            amplitudeNormalizationFactor = (SampleType) 1;
+            amplitudeNormalizationFactor = static_cast<SampleType>(1);
     }
 
     template<size_t maxNumModes, typename SampleType>
@@ -65,7 +65,7 @@ namespace MarsDSP::DSP
             {
                 modeAmps[j] = modeIndex < numModesToProcess
                                   ? amplitudeData[modeIndex] * amplitudeNormalizationFactor
-                                  : (SampleType) 0;
+                                  : static_cast<SampleType>(0);
             },
             [&](auto &mode)
             {
@@ -83,8 +83,8 @@ namespace MarsDSP::DSP
             {
                 auto freq = modeIndex < maxNumModes
                                 ? (baseFrequencies[modeIndex] * frequencyMultiplier)
-                                : (SampleType) 0;
-                modeFreqs[j] = freq > maxFreq ? (SampleType) 0 : freq;
+                                : static_cast<SampleType>(0);
+                modeFreqs[j] = freq > maxFreq ? static_cast<SampleType>(0) : freq;
             },
             [&](auto &mode)
             {
@@ -100,7 +100,7 @@ namespace MarsDSP::DSP
         doForModes(
             [&](size_t j, size_t modeIndex)
             {
-                modeTaus[j] = modeIndex < maxNumModes ? baseTaus[modeIndex] : (SampleType) 1;
+                modeTaus[j] = modeIndex < maxNumModes ? baseTaus[modeIndex] : static_cast<SampleType>(1);
             },
             [&](auto &mode)
             {
@@ -115,7 +115,7 @@ namespace MarsDSP::DSP
         doForModes(
             [&](size_t j, size_t modeIndex)
             {
-                modeT60s[j] = modeIndex < maxNumModes ? t60s[modeIndex] : (SampleType) 0;
+                modeT60s[j] = modeIndex < maxNumModes ? t60s[modeIndex] : static_cast<SampleType>(0);
             },
             [&](auto &mode)
             {
@@ -140,10 +140,10 @@ namespace MarsDSP::DSP
     void ModalFilterBank<maxNumModes, SampleType>::prepare(double sampleRate, int samplesPerBlock)
     {
         maxFreq = SampleType(0.495 * sampleRate);
-        renderBuffer.setSize(1, (int)samplesPerBlock, false, false, true);
+        renderBuffer.setSize(1, static_cast<int>(samplesPerBlock), false, false, true);
 
         for (auto &mode: modes)
-            mode.prepare((SampleType) sampleRate);
+            mode.prepare(static_cast<SampleType>(sampleRate));
     }
 
     template<size_t maxNumModes, typename SampleType>
@@ -158,7 +158,7 @@ namespace MarsDSP::DSP
     {
         const auto numSamples = block.getNumSamples();
 
-        renderBuffer.setSize(1, (int)numSamples, false, false, true);
+        renderBuffer.setSize(1, static_cast<int>(numSamples), false, false, true);
         renderBuffer.clear();
 
         const auto *blockPtr = block.getReadPointer(0);
@@ -178,7 +178,7 @@ namespace MarsDSP::DSP
     {
         const auto numSamples = block.getNumSamples();
 
-        renderBuffer.setSize(1, (int)numSamples, false, false, true);
+        renderBuffer.setSize(1, static_cast<int>(numSamples), false, false, true);
         renderBuffer.clear();
 
         const auto *blockPtr = block.getReadPointer(0);

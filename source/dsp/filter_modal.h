@@ -4,7 +4,6 @@
 #define MEMORYBOY_FILTER_MODAL_H
 
 #include <JuceHeader.h>
-
 #include "math/buffer_math.h"
 #include "simd/simd_complex.h"
 
@@ -16,8 +15,11 @@ inline Modal
     {
     public:
         ModalFilter() = default;
+
         virtual ~ModalFilter() = default;
+
         virtual void prepare(T sampleRate);
+
         virtual void reset() noexcept { y1 = std::complex<T>{static_cast<T>(0.0)}; }
         virtual void setAmp(std::complex<T> amp) noexcept { amplitude = amp; }
         virtual void setAmp(T amp, T phase) noexcept { amplitude = std::polar(amp, phase); }
@@ -85,8 +87,11 @@ inline Modal
 
     public:
         ModalFilter() = default;
+
         virtual ~ModalFilter() = default;
+
         virtual void prepare(FloatType sampleRate);
+
         virtual void reset() noexcept { y1 = CType{}; }
         virtual void setAmp(VType amp) noexcept { amplitude = CType{amp, xsimd::batch(static_cast<FloatType>(0))}; }
         virtual void setAmp(CType amp) noexcept { amplitude = amp; }

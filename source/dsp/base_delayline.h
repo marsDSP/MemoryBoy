@@ -8,253 +8,262 @@
 #include "math/buffer_math.h"
 #include "utils/type_utils.h"
 
-namespace MarsDSP::DSP {
-#ifndef DOXYGEN
-/** Base class for delay lines with any interpolation type */
-template <typename SampleType, typename StorageType = SampleType>
-class DelayLineBase
+namespace MarsDSP::DSP
 {
-public:
-    using NumericType = Math::BufferMath::SampleTypeHelpers::NumericType<SampleType>;
-
-    DelayLineBase() = default;
-    virtual ~DelayLineBase() = default;
-
-    virtual void setDelay (NumericType /* newDelayInSamples */) = 0;
-    [[nodiscard]] virtual NumericType getDelay() const = 0;
-
-    virtual void prepare (const dsp::ProcessSpec& /* spec */) = 0;
-    virtual void free() = 0;
-    virtual void reset() = 0;
-
-    virtual void pushSample (int /* channel */, SampleType /* sample */) noexcept = 0;
-    virtual SampleType popSample (int /* channel */) noexcept = 0;
-    virtual SampleType popSample (int /* channel */, NumericType /* delayInSamples */, bool /* updateReadPointer */) noexcept = 0;
-    virtual void incrementReadPointer (int channel) noexcept = 0;
-
-    void copyState (const DelayLineBase& other)
+#ifndef DOXYGEN
+    /** Base class for delay lines with any interpolation type */
+    template<typename SampleType, typename StorageType = SampleType>
+    class DelayLineBase
     {
-        const auto numChannels = other.bufferData.getNumChannels();
-        const auto numSamples = other.bufferData.getNumSamples();
-        if (numChannels != bufferData.getNumChannels()
-            || numSamples != bufferData.getNumSamples())
+    public:
+        using NumericType = Math::BufferMath::SampleTypeHelpers::NumericType<SampleType>;
+
+        DelayLineBase() = default;
+
+        virtual ~DelayLineBase() = default;
+
+        virtual void setDelay(NumericType /* newDelayInSamples */) = 0;
+
+        [[nodiscard]] virtual NumericType getDelay() const = 0;
+
+        virtual void prepare(const dsp::ProcessSpec & /* spec */) = 0;
+
+        virtual void free() = 0;
+
+        virtual void reset() = 0;
+
+        virtual void pushSample(int /* channel */, SampleType /* sample */) noexcept = 0;
+
+        virtual SampleType popSample(int /* channel */) noexcept = 0;
+
+        virtual SampleType popSample(int /* channel */, NumericType /* delayInSamples */,
+                                     bool /* updateReadPointer */) noexcept = 0;
+
+        virtual void incrementReadPointer(int channel) noexcept = 0;
+
+        void copyState(const DelayLineBase &other)
         {
-            bufferData.setMaxSize (numChannels, numSamples);
+            const auto numChannels = other.bufferData.getNumChannels();
+            const auto numSamples = other.bufferData.getNumSamples();
+            if (numChannels != bufferData.getNumChannels()
+                || numSamples != bufferData.getNumSamples())
+            {
+                bufferData.setMaxSize(numChannels, numSamples);
+            }
+
+            Math::BufferMath::copyBufferData(other.bufferData, bufferData);
+
+            if (v.empty() || other.v.empty()) // nothing to copy!
+                return;
+
+            std::copy(other.v.begin(), other.v.end(), v.begin());
+            std::copy(other.writePos.begin(), other.writePos.end(), writePos.begin());
+            std::copy(other.readPos.begin(), other.readPos.end(), readPos.begin());
         }
 
-        Math::BufferMath::copyBufferData (other.bufferData, bufferData);
+        [[nodiscard]] Buffers::BufferView<SampleType> getRawDelayBuffer() { return bufferData; }
+        [[nodiscard]] Buffers::BufferView<const SampleType> getRawDelayBuffer() const { return bufferData; }
 
-        if (v.empty() || other.v.empty()) // nothing to copy!
-            return;
-
-        std::copy (other.v.begin(), other.v.end(), v.begin());
-        std::copy (other.writePos.begin(), other.writePos.end(), writePos.begin());
-        std::copy (other.readPos.begin(), other.readPos.end(), readPos.begin());
-    }
-
-    [[nodiscard]] Buffers::BufferView<SampleType> getRawDelayBuffer() { return bufferData; }
-    [[nodiscard]] Buffers::BufferView<const SampleType> getRawDelayBuffer() const { return bufferData; }
-
-protected:
-    Buffers::Buffer<StorageType> bufferData;
-    std::vector<SampleType> v;
-    std::vector<int> writePos, readPos;
-};
+    protected:
+        Buffers::Buffer<StorageType> bufferData;
+        std::vector<SampleType> v;
+        std::vector<int> writePos, readPos;
+    };
 #endif // DOXYGEN
 
-//==============================================================================
-/**
-    A delay line processor featuring several algorithms for the fractional delay
-    calculation, block processing, and sample-by-sample processing useful when
-    modulating the delay in real time or creating a standard delay effect with
-    feedback.
-
-    This implementation has been modified from the original JUCE implementation
-    to include 5th-order Lagrange Interpolation.
-
-    Note: If you intend to change the delay in real time, you may want to smooth
-    changes to the delay systematically using either a ramp or a low-pass filter.
-*/
-template <typename SampleType, typename InterpolationType = dsp::DelayLineInterpolationTypes::Linear, typename StorageType = SampleType>
-class DelayLine : public DelayLineBase<SampleType, StorageType>
-{
-    using NumericType = Utils::ProcessorNumericType<DelayLine>;
-
-public:
     //==============================================================================
-    /** Default constructor. */
-    DelayLine();
+    /**
+        A delay line processor featuring several algorithms for the fractional delay
+        calculation, block processing, and sample-by-sample processing useful when
+        modulating the delay in real time or creating a standard delay effect with
+        feedback.
 
-    /** Constructor. */
-    explicit DelayLine (int maximumDelayInSamples);
+        This implementation has been modified from the original JUCE implementation
+        to include 5th-order Lagrange Interpolation.
 
-    //==============================================================================
-    /** Sets the delay in samples. */
-    void setDelay (NumericType newDelayInSamples) final;
-
-    /** Returns the current delay in samples. */
-    NumericType getDelay() const final;
-
-    //==============================================================================
-    /** Initialises the processor. */
-    void prepare (const juce::dsp::ProcessSpec& spec) final;
-
-    /** Frees internal memory. */
-    void free() final;
-
-    /** Resets the internal state variables of the processor. */
-    void reset() final;
-
-    //==============================================================================
-    /** Pushes a single sample into one channel of the delay line.
-
-        Use this function and popSample instead of process if you need to modulate
-        the delay in real time instead of using a fixed delay value, or if you want
-        to code a delay effect with a feedback loop.
-
-        @see setDelay, popSample, process
+        Note: If you intend to change the delay in real time, you may want to smooth
+        changes to the delay systematically using either a ramp or a low-pass filter.
     */
-    inline void pushSample (int channel, SampleType sample) noexcept final
+    template<typename SampleType, typename InterpolationType = dsp::DelayLineInterpolationTypes::Linear, typename
+        StorageType = SampleType>
+    class DelayLine : public DelayLineBase<SampleType, StorageType>
     {
-        const auto writePtr = this->writePos[static_cast<size_t>(channel)];
-        bufferPtrs[static_cast<size_t>(channel)][writePtr] = static_cast<StorageType> (sample);
-        bufferPtrs[static_cast<size_t>(channel)][writePtr + totalSize] = static_cast<StorageType> (sample);
-        incrementWritePointer (channel);
-    }
+        using NumericType = Utils::ProcessorNumericType<DelayLine>;
 
-    /** Pops a single sample from one channel of the delay line.
+    public:
+        //==============================================================================
+        /** Default constructor. */
+        DelayLine();
 
-        Use this function to modulate the delay in real time or implement standard
-        delay effects with feedback.
+        /** Constructor. */
+        explicit DelayLine(int maximumDelayInSamples);
 
-        @param channel              the target channel for the delay line.
+        //==============================================================================
+        /** Sets the delay in samples. */
+        void setDelay(NumericType newDelayInSamples) final;
 
-        @see setDelay, pushSample, process
-    */
-    inline SampleType popSample (int channel) noexcept final
-    {
-        auto result = interpolateSample (channel);
-        incrementReadPointer (channel);
+        /** Returns the current delay in samples. */
+        NumericType getDelay() const final;
 
-        return result;
-    }
+        //==============================================================================
+        /** Initialises the processor. */
+        void prepare(const juce::dsp::ProcessSpec &spec) final;
 
-    /** Pops a single sample from one channel of the delay line.
+        /** Frees internal memory. */
+        void free() final;
 
-        Use this function to modulate the delay in real time or implement standard
-        delay effects with feedback.
+        /** Resets the internal state variables of the processor. */
+        void reset() final;
 
-        @param channel              the target channel for the delay line.
+        //==============================================================================
+        /** Pushes a single sample into one channel of the delay line.
 
-        @param delayInSamples       sets the wanted fractional delay in samples, or -1
-                                    to use the value being used before or set with
-                                    setDelay function.
+            Use this function and popSample instead of process if you need to modulate
+            the delay in real time instead of using a fixed delay value, or if you want
+            to code a delay effect with a feedback loop.
 
-        @param updateReadPointer    should be set to true if you use the function
-                                    once for each sample, or false if you need
-                                    multi-tap delay capabilities.
-
-        @see setDelay, pushSample, process
-    */
-    inline SampleType popSample (int channel, NumericType delayInSamples, bool updateReadPointer) noexcept final
-    {
-        setDelay (delayInSamples);
-
-        auto result = interpolateSample (channel);
-
-        if (updateReadPointer)
-            incrementReadPointer (channel);
-
-        return result;
-    }
-
-    /** Increment the read pointer without reading an interpolated sample (be careful...) */
-    inline void incrementReadPointer (int channel) noexcept final
-    {
-        auto newReadPtr = this->readPos[static_cast<size_t>(channel)] + totalSize - 1;
-        newReadPtr = newReadPtr > totalSize ? newReadPtr - totalSize : newReadPtr;
-        this->readPos[static_cast<size_t>(channel)] = newReadPtr;
-    }
-
-    /** Process a block of audio. */
-    void processBlock (const Buffers::BufferView<SampleType>& buffer)
-    {
-        for (auto [channelIndex, channelData] : Buffers::channels (buffer))
+            @see setDelay, popSample, process
+        */
+        inline void pushSample(int channel, SampleType sample) noexcept final
         {
-            for (auto& sample : channelData)
+            const auto writePtr = this->writePos[static_cast<size_t>(channel)];
+            bufferPtrs[static_cast<size_t>(channel)][writePtr] = static_cast<StorageType>(sample);
+            bufferPtrs[static_cast<size_t>(channel)][writePtr + totalSize] = static_cast<StorageType>(sample);
+            incrementWritePointer(channel);
+        }
+
+        /** Pops a single sample from one channel of the delay line.
+
+            Use this function to modulate the delay in real time or implement standard
+            delay effects with feedback.
+
+            @param channel              the target channel for the delay line.
+
+            @see setDelay, pushSample, process
+        */
+        inline SampleType popSample(int channel) noexcept final
+        {
+            auto result = interpolateSample(channel);
+            incrementReadPointer(channel);
+
+            return result;
+        }
+
+        /** Pops a single sample from one channel of the delay line.
+
+            Use this function to modulate the delay in real time or implement standard
+            delay effects with feedback.
+
+            @param channel              the target channel for the delay line.
+
+            @param delayInSamples       sets the wanted fractional delay in samples, or -1
+                                        to use the value being used before or set with
+                                        setDelay function.
+
+            @param updateReadPointer    should be set to true if you use the function
+                                        once for each sample, or false if you need
+                                        multi-tap delay capabilities.
+
+            @see setDelay, pushSample, process
+        */
+        inline SampleType popSample(int channel, NumericType delayInSamples, bool updateReadPointer) noexcept final
+        {
+            setDelay(delayInSamples);
+
+            auto result = interpolateSample(channel);
+
+            if (updateReadPointer)
+                incrementReadPointer(channel);
+
+            return result;
+        }
+
+        /** Increment the read pointer without reading an interpolated sample (be careful...) */
+        inline void incrementReadPointer(int channel) noexcept final
+        {
+            auto newReadPtr = this->readPos[static_cast<size_t>(channel)] + totalSize - 1;
+            newReadPtr = newReadPtr > totalSize ? newReadPtr - totalSize : newReadPtr;
+            this->readPos[static_cast<size_t>(channel)] = newReadPtr;
+        }
+
+        /** Process a block of audio. */
+        void processBlock(const Buffers::BufferView<SampleType> &buffer)
+        {
+            for (auto [channelIndex, channelData]: Buffers::channels(buffer))
             {
-                pushSample (channelIndex, sample);
-                sample = popSample (channelIndex);
+                for (auto &sample: channelData)
+                {
+                    pushSample(channelIndex, sample);
+                    sample = popSample(channelIndex);
+                }
             }
         }
-    }
 
-    //==============================================================================
-    /** Processes the input and output samples supplied in the processing context.
+        //==============================================================================
+        /** Processes the input and output samples supplied in the processing context.
 
-        Can be used for block processing when the delay is not going to change
-        during processing. The delay must first be set by calling setDelay.
+            Can be used for block processing when the delay is not going to change
+            during processing. The delay must first be set by calling setDelay.
 
-        @see setDelay
-    */
-    template <typename ProcessContext>
-    void process (const ProcessContext& context) noexcept
-    {
-        const auto& inputBlock = context.getInputBlock();
-        auto& outputBlock = context.getOutputBlock();
-        const auto numChannels = outputBlock.getNumChannels();
-        const auto numSamples = outputBlock.getNumSamples();
-
-        jassert (inputBlock.getNumChannels() == numChannels);
-        jassert (inputBlock.getNumChannels() == this->writePos.size());
-        jassert (inputBlock.getNumSamples() == numSamples);
-
-        if (context.isBypassed)
+            @see setDelay
+        */
+        template<typename ProcessContext>
+        void process(const ProcessContext &context) noexcept
         {
-            outputBlock.copyFrom (inputBlock);
-            return;
-        }
+            const auto &inputBlock = context.getInputBlock();
+            auto &outputBlock = context.getOutputBlock();
+            const auto numChannels = outputBlock.getNumChannels();
+            const auto numSamples = outputBlock.getNumSamples();
 
-        for (size_t channel = 0; channel < numChannels; ++channel)
-        {
-            auto* inputSamples = inputBlock.getChannelPointer (channel);
-            auto* outputSamples = outputBlock.getChannelPointer (channel);
+            jassert(inputBlock.getNumChannels() == numChannels);
+            jassert(inputBlock.getNumChannels() == this->writePos.size());
+            jassert(inputBlock.getNumSamples() == numSamples);
 
-            for (size_t i = 0; i < numSamples; ++i)
+            if (context.isBypassed)
             {
-                pushSample (static_cast<int>(channel), inputSamples[i]);
-                outputSamples[i] = popSample (static_cast<int>(channel));
+                outputBlock.copyFrom(inputBlock);
+                return;
+            }
+
+            for (size_t channel = 0; channel < numChannels; ++channel)
+            {
+                auto *inputSamples = inputBlock.getChannelPointer(channel);
+                auto *outputSamples = outputBlock.getChannelPointer(channel);
+
+                for (size_t i = 0; i < numSamples; ++i)
+                {
+                    pushSample(static_cast<int>(channel), inputSamples[i]);
+                    outputSamples[i] = popSample(static_cast<int>(channel));
+                }
             }
         }
-    }
 
-private:
-    SampleType interpolateSample (int channel) noexcept
-    {
-        auto index = (this->readPos[static_cast<size_t>(channel)] + delayInt);
-        return interpolator.call (bufferPtrs[static_cast<size_t>(channel)],
-                                  index,
-                                  delayFrac,
-                                  this->v[static_cast<size_t>(channel)]);
-    }
+    private:
+        SampleType interpolateSample(int channel) noexcept
+        {
+            auto index = (this->readPos[static_cast<size_t>(channel)] + delayInt);
+            return interpolator.call(bufferPtrs[static_cast<size_t>(channel)],
+                                     index,
+                                     delayFrac,
+                                     this->v[static_cast<size_t>(channel)]);
+        }
 
-    /** Increment the write pointer (be careful...) */
-    void incrementWritePointer (int channel) noexcept
-    {
-        auto newWritePtr = this->writePos[static_cast<size_t>(channel)] + totalSize - 1;
-        newWritePtr = newWritePtr >= totalSize ? newWritePtr - totalSize : newWritePtr;
-        this->writePos[static_cast<size_t>(channel)] = newWritePtr;
-    }
+        /** Increment the write pointer (be careful...) */
+        void incrementWritePointer(int channel) noexcept
+        {
+            auto newWritePtr = this->writePos[static_cast<size_t>(channel)] + totalSize - 1;
+            newWritePtr = newWritePtr >= totalSize ? newWritePtr - totalSize : newWritePtr;
+            this->writePos[static_cast<size_t>(channel)] = newWritePtr;
+        }
 
-    //==============================================================================
-    InterpolationType interpolator;
-    std::vector<StorageType*> bufferPtrs;
-    NumericType delay = 0.0, delayFrac = 0.0;
-    int delayInt = 0, totalSize = 4;
+        //==============================================================================
+        InterpolationType interpolator;
+        std::vector<StorageType *> bufferPtrs;
+        NumericType delay = 0.0, delayFrac = 0.0;
+        int delayInt = 0, totalSize = 4;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DelayLine)
-};
-
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DelayLine)
+    };
 } // namespace MarsDSP
 
 #endif

@@ -65,13 +65,19 @@ namespace MarsDSP::DSP
             mean = 0.0f;
         }
 
+        void setMeanReversion(float newMeanReversion) noexcept
+        {
+            meanReversion = juce::jlimit(0.0f, 1.0f, newMeanReversion);
+        }
+
         float process(int n, size_t ch) noexcept
         {
             if (amt <= 0.0f || rPtr == nullptr)
                 return 0.0f;
 
             y[ch] += sqrtdelta * rPtr[n] * amt;
-            y[ch] += damping * (mean - y[ch]) * T;
+            const auto driftToMean = juce::jmap(meanReversion, 0.5f, 8.5f);
+            y[ch] += damping * driftToMean * (mean - y[ch]) * T;
             return lpf.processSample(static_cast<int>(ch), y[ch]);
         }
 
@@ -83,6 +89,7 @@ namespace MarsDSP::DSP
         float amt = 0.0f;
         float mean = 0.0f;
         float damping = 0.0f;
+        float meanReversion = 0.0f;
 
         noise<float> noiseGen;
         juce::AudioBuffer<float> noiseBuffer;

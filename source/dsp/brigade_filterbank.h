@@ -119,7 +119,7 @@ namespace MarsDSP::DSP
             poles = xsimd::load_aligned(BBDFilterSpec::oFiltPole);
         }
 
-        [[nodiscard]] float calcH0() const noexcept { return -1.0f * xsimd::reduce_add(Amult.real()); }
+        [[nodiscard]] float calcH0() const noexcept { return -1.0f * xsimd::reduce_add(gCoef.real()); }
 
         void set_freq(float freq)
         {

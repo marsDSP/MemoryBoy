@@ -60,6 +60,7 @@ private:
     std::atomic<float>* feedbackParameter = nullptr;
     std::atomic<float>* mixParameter = nullptr;
     std::atomic<float>* modParameter = nullptr;
+    std::atomic<float>* diffusorParameter = nullptr;
     std::atomic<float>* inputFilterParameter = nullptr;
     std::atomic<float>* outputFilterParameter = nullptr;
 

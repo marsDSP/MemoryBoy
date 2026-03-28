@@ -7,6 +7,7 @@ namespace
     constexpr auto feedbackParameterId = "feedback";
     constexpr auto mixParameterId = "mix";
     constexpr auto modParameterId = "mod";
+    constexpr auto diffusorParameterId = "diffusor";
     constexpr auto inputFilterParameterId = "inputFilterHz";
     constexpr auto outputFilterParameterId = "outputFilterHz";
 }
@@ -22,6 +23,7 @@ MemoryBoyProcessor::MemoryBoyProcessor()
     feedbackParameter = parameters.getRawParameterValue (feedbackParameterId);
     mixParameter = parameters.getRawParameterValue (mixParameterId);
     modParameter = parameters.getRawParameterValue (modParameterId);
+    diffusorParameter = parameters.getRawParameterValue (diffusorParameterId);
     inputFilterParameter = parameters.getRawParameterValue (inputFilterParameterId);
     outputFilterParameter = parameters.getRawParameterValue (outputFilterParameterId);
 }
@@ -98,6 +100,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MemoryBoyProcessor::createPa
         0.0f));
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { diffusorParameterId, 1 },
+        "Diffusor",
+        juce::NormalisableRange<float> { 0.0f, 100.0f, 0.1f, 3.0f },
+        0.0f));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { inputFilterParameterId, 1 },
         "Input Filter",
         juce::NormalisableRange<float> { 200.0f, 20000.0f, 1.0f, 0.35f },
@@ -123,6 +131,7 @@ void MemoryBoyProcessor::updateProcessingParameters()
 
     const auto delayMs = delayMsParameter != nullptr ? delayMsParameter->load() : 350.0f;
     const auto modAmount = modParameter != nullptr ? modParameter->load() * 0.01f : 0.0f;
+    const auto diffusorAmount = diffusorParameter != nullptr ? diffusorParameter->load() * 0.01f : 0.0f;
     const auto inputFilterHz = inputFilterParameter != nullptr
                                    ? inputFilterParameter->load()
                                    : MarsDSP::DSP::BBDFilterSpec::inputFilterOriginalCutoff;
@@ -132,6 +141,7 @@ void MemoryBoyProcessor::updateProcessingParameters()
 
     brigadeDelay.setDelay (delayMs * 0.001f * sampleRate);
     brigadeDelay.setTapModulation (juce::jlimit (0.0f, 1.0f, modAmount));
+    brigadeDelay.setDiffusor (juce::jlimit (0.0f, 1.0f, diffusorAmount));
     brigadeDelay.setInputFilterFreq (inputFilterHz);
     brigadeDelay.setOutputFilterFreq (outputFilterHz);
 }
@@ -247,22 +257,31 @@ void MemoryBoyProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     const auto feedback = juce::jlimit (0.0f, 0.95f, feedbackParameter != nullptr ? feedbackParameter->load() : 0.35f);
     const auto mix = juce::jlimit (0.0f, 1.0f, mixParameter != nullptr ? mixParameter->load() : 0.35f);
 
+    std::vector<float*> channelData (static_cast<size_t> (totalNumInputChannels), nullptr);
+    std::vector<float> inputFrame (static_cast<size_t> (totalNumInputChannels), 0.0f);
+
     for (auto channel = 0; channel < totalNumInputChannels; ++channel)
+        channelData[static_cast<size_t> (channel)] = buffer.getWritePointer (channel);
+
+    for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-        auto delayedSample = feedbackSamples[static_cast<size_t> (channel)];
-
-        for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
+        for (auto channel = 0; channel < totalNumInputChannels; ++channel)
         {
-            const auto drySample = channelData[sample];
-
-            brigadeDelay.pushSample (channel, drySample + delayedSample * feedback);
-            delayedSample = brigadeDelay.popSample (channel);
-
-            channelData[sample] = drySample * (1.0f - mix) + delayedSample * mix;
+            const auto channelIndex = static_cast<size_t> (channel);
+            const auto drySample = channelData[channelIndex][sample];
+            inputFrame[channelIndex] = drySample + feedbackSamples[channelIndex] * feedback;
         }
 
-        feedbackSamples[static_cast<size_t> (channel)] = delayedSample;
+        const auto& delayedFrame = brigadeDelay.processFrame (inputFrame.data(), totalNumInputChannels);
+
+        for (auto channel = 0; channel < totalNumInputChannels; ++channel)
+        {
+            const auto channelIndex = static_cast<size_t> (channel);
+            const auto drySample = channelData[channelIndex][sample];
+            const auto delayedSample = delayedFrame[channelIndex];
+            feedbackSamples[channelIndex] = delayedSample;
+            channelData[channelIndex][sample] = drySample * (1.0f - mix) + delayedSample * mix;
+        }
     }
 }
 

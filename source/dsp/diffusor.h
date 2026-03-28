@@ -2,6 +2,8 @@
 
 #ifndef MEMORYBOY_DIFFUSOR_H
 #define MEMORYBOY_DIFFUSOR_H
+#include <array>
+#include <cmath>
 #include <random>
 #include <JuceHeader.h>
 
@@ -36,7 +38,7 @@ JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4324) // structure was padded due to alignment 
  */
 template <typename FloatType,
           int nChannels,
-          typename DelayInterpType = dsp::DelayLineInterpolationTypes::None,
+          typename DelayInterpType = Buffers::DelayLineInterpolationTypes::None,
           int delayBufferSize = 1 << 18,
           typename StorageType = FloatType>
 class Diffuser
@@ -50,17 +52,51 @@ public:
 
     /** Prepares the diffuser for a given sample rate and configuration */
     template <typename DiffuserConfig = DefaultDiffuserConfig>
-    void prepare (double sampleRate);
+    void prepare (double sampleRate)
+    {
+        fsOver1000 = static_cast<FloatType>(sampleRate) / static_cast<FloatType>(1000);
+
+        std::random_device rd;
+        std::mt19937 randGenerator (rd());
+
+        DiffuserConfig::fillChannelSwapIndexes (channelSwapIndexes.data(), nChannels, randGenerator);
+
+        delayWritePointer = 0;
+        for (size_t i = 0; i < static_cast<size_t>(nChannels); ++i)
+        {
+            delays[i].reset();
+            delayRelativeMults[i] = static_cast<FloatType> (DiffuserConfig::getDelayMult (static_cast<int> (i), nChannels, randGenerator));
+            polarityMultipliers[i] = static_cast<FloatType> (DiffuserConfig::getPolarityMultiplier (static_cast<int> (i), nChannels, randGenerator));
+            delayReadPointers[i] = FloatType {};
+        }
+    }
 
     /** Resets the diffuser state */
-    void reset();
+    void reset()
+    {
+        delayWritePointer = 0;
+        for (auto& delay : delays)
+            delay.reset();
+
+        std::fill (delayReadPointers.begin(), delayReadPointers.end(), FloatType {});
+        std::fill (outData.begin(), outData.end(), FloatType {});
+    }
 
     /** Sets the diffusion time in milliseconds */
-    void setDiffusionTimeMs (FloatType diffusionTimeMs);
+    void setDiffusionTimeMs (FloatType diffusionTimeMs)
+    {
+        for (size_t i = 0; i < static_cast<size_t> (nChannels); ++i)
+        {
+            const auto delayTimesSamples = delayRelativeMults[i] * diffusionTimeMs * fsOver1000;
+            delayReadPointers[i] = DelayType::getReadPointer (delayWritePointer, delayTimesSamples);
+        }
+    }
 
     /** Processes a set of channels */
     inline const FloatType* process (const FloatType* data) noexcept
     {
+        using HadamardMix = Math::MatrixOps::Hadamard<FloatType, nChannels>;
+
         // Delay
         for (size_t i = 0; i < static_cast<size_t>(nChannels); ++i)
             delays[i].pushSample (data[i], delayWritePointer);
@@ -73,7 +109,25 @@ public:
         }
 
         // Mix with a Hadamard matrix
-        Math::MatrixOps::Hadamard<FloatType, nChannels>::inPlace (outData.data());
+        if constexpr (std::is_floating_point_v<FloatType>)
+        {
+            if (Math::SIMDUtils::isAligned (outData.data()))
+            {
+                HadamardMix::inPlace (outData.data());
+            }
+            else
+            {
+                HadamardMix::recursiveUnscaled (outData.data(), outData.data());
+
+                constexpr auto scalingFactor = static_cast<FloatType> (gcem::sqrt (1.0 / static_cast<double> (nChannels)));
+                for (auto& sample : outData)
+                    sample *= scalingFactor;
+            }
+        }
+        else
+        {
+            HadamardMix::inPlace (outData.data());
+        }
 
         // Flip some polarities
         for (size_t i = 0; i < static_cast<size_t>(nChannels); ++i)
@@ -128,13 +182,28 @@ public:
 
     /** Prepares the diffuser chain with a given sample rate and configurations */
     template <typename DiffuserChainConfig = DiffuserChainEqualConfig, typename DiffuserConfig = DefaultDiffuserConfig>
-    void prepare (double sampleRate);
+    void prepare (double sampleRate)
+    {
+        for (size_t i = 0; i < static_cast<size_t> (nStages); ++i)
+        {
+            stages[i].template prepare<DiffuserConfig> (sampleRate);
+            diffusionTimeMults[i] = static_cast<FloatType> (DiffuserChainConfig::getDiffusionMult (static_cast<int> (i), nStages));
+        }
+    }
 
     /** Resets the state of each diffuser */
-    void reset();
+    void reset()
+    {
+        for (auto& stage : stages)
+            stage.reset();
+    }
 
     /** Sets the diffusion time of the diffusion chain */
-    void setDiffusionTimeMs (FloatType diffusionTimeMs);
+    void setDiffusionTimeMs (FloatType diffusionTimeMs)
+    {
+        for (size_t i = 0; i < static_cast<size_t> (nStages); ++i)
+            stages[i].setDiffusionTimeMs (diffusionTimeMs * diffusionTimeMults[i]);
+    }
 
     /** Processes a set of channels */
     inline const FloatType* process (const FloatType* data) noexcept

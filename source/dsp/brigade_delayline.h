@@ -73,6 +73,12 @@ namespace MarsDSP::DSP
             tapDrift.prepareBlock(modulationAmount, juce::jmax(numSamples, 1));
         }
 
+        void setDiffusor(float newAmount) noexcept
+        {
+            diffusorAmount = juce::jlimit(0.0f, 1.0f, newAmount);
+            tapDrift.setMeanReversion(diffusorAmount);
+        }
+
         template<bool A = ALIEN>
         std::enable_if_t<A, float>
         process(float u) noexcept
@@ -180,6 +186,7 @@ namespace MarsDSP::DSP
         float Ts_bbd = Ts;
         float baseDelaySec = Ts;
         float modulationAmount = 0.0f;
+        float diffusorAmount = 0.0f;
         int modulationSampleIndex = 0;
 
         std::unique_ptr<InputFilterBank> inputFilter;

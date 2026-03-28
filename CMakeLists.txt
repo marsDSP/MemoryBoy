@@ -110,7 +110,8 @@ add_library(SharedCode INTERFACE
         source/simd/SIMDAudioBlock.h
         source/math/buffer_helpers_simd.h
         source/dsp/brigade_filterbank.h
-        source/dsp/brigade_delayline.h)
+        source/dsp/brigade_delayline.h
+        source/dsp/brigade_wrapper.h)
 
 # Set compile features for SharedCode
 target_compile_features(SharedCode INTERFACE cxx_std_23)

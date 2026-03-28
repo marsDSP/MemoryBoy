@@ -4,3 +4,6 @@
 [submodule "libs/JUCE"]
 	path = libs/JUCE
 	url = https://github.com/marsDSP/JUCE.git
+[submodule "libs/gcem"]
+	path = libs/gcem
+	url = https://github.com/kthohr/gcem.git

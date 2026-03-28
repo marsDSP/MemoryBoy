@@ -93,7 +93,22 @@ add_compile_definitions(JUCE_PROJECT_NAME="${PROJECT_NAME}")
 # Define SharedCode as an INTERFACE library (no sources required)
 add_library(SharedCode INTERFACE
         source/MemoryBoyProcessor.h
-        source/simd/simd_complex.h)
+        source/simd/simd_complex.h
+        source/dsp/filter_modalbank.h
+        source/math/buffer_math.h
+        source/utils/type_utils.h
+        source/dsp/base_delayline.cpp
+        source/dsp/base_delayline.h
+        source/math/buffer_math.cpp
+        source/math/buffer_head.cpp
+        source/math/buffer_head.h
+        source/math/buffer_detail.h
+        source/math/buffer_helpers.h
+        source/math/buffer_static.cpp
+        source/math/buffer_static.h
+        source/math/buffer_view.h
+        source/simd/SIMDAudioBlock.h
+        source/math/buffer_helpers_simd.h)
 
 # Set compile features for SharedCode
 target_compile_features(SharedCode INTERFACE cxx_std_23)
@@ -107,6 +122,7 @@ target_include_directories(SharedCode INTERFACE
         "${CMAKE_CURRENT_SOURCE_DIR}/libs"
         "${CMAKE_CURRENT_SOURCE_DIR}/libs/JUCE/modules"
         "${CMAKE_CURRENT_SOURCE_DIR}/libs/xsimd/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/libs/gcem/include"
         "${GENERATED_DIR}"
 )
 

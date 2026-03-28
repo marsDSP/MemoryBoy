@@ -1,0 +1,6 @@
+[submodule "libs/xsimd"]
+	path = libs/xsimd
+	url = https://github.com/marsDSP/xsimd.git
+[submodule "libs/JUCE"]
+	path = libs/JUCE
+	url = https://github.com/marsDSP/JUCE.git

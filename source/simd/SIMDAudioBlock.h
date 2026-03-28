@@ -15,11 +15,12 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <xsimd/xsimd.hpp>
 
+// might want to look into simplifying some of these soon
 namespace MarsDSP::Utils::Buffers {
     
     template <typename SampleType>
     class SIMDAudioBlock {
-    private:
+    private: // is this changing access level?
         template <typename OtherSampleType>
         using MayUseConvertingConstructor =
             std::enable_if_t<std::is_same<std::remove_const_t<SampleType>,
@@ -30,7 +31,7 @@ namespace MarsDSP::Utils::Buffers {
 
     public:
         
-        using NumericType = juce::dsp::SampleTypeHelpers::ElementType<SampleType>::Type;
+        using NumericType = dsp::SampleTypeHelpers::ElementType<SampleType>::Type;
         SIMDAudioBlock() noexcept = default;
 
         constexpr SIMDAudioBlock (SampleType* const* channelData,
@@ -50,7 +51,7 @@ namespace MarsDSP::Utils::Buffers {
         {
         }
 
-        SIMDAudioBlock (juce::HeapBlock<char>& heapBlockToUseForAllocation,
+        SIMDAudioBlock (HeapBlock<char>& heapBlockToUseForAllocation,
                         size_t numberOfChannels,
                         size_t numberOfSamples,
                         size_t alignmentInBytes = defaultAlignment) noexcept
@@ -123,7 +124,7 @@ namespace MarsDSP::Utils::Buffers {
             return ! (*this == other);
         }
 
-        [[nodiscard]] constexpr size_t getNumChannels() const noexcept { return static_cast<size_t> (numChannels); }
+        [[nodiscard]] constexpr size_t getNumChannels() const noexcept { return numChannels; }
         [[nodiscard]] constexpr size_t getNumSamples() const noexcept { return numSamples; }
 
         SampleType* getChannelPointer (size_t channel) const noexcept
@@ -392,13 +393,13 @@ namespace MarsDSP::Utils::Buffers {
         }
 
         template <typename BlockSampleType, typename SmootherSampleType, typename SmoothingType>
-        SIMDAudioBlock& replaceWithProductOf (SIMDAudioBlock<BlockSampleType> src, juce::SmoothedValue<SmootherSampleType, SmoothingType>& value) noexcept
+        SIMDAudioBlock& replaceWithProductOf (SIMDAudioBlock<BlockSampleType> src, SmoothedValue<SmootherSampleType, SmoothingType>& value) noexcept
         {
             replaceWithProductOfInternal (src, value);
             return *this;
         }
         template <typename BlockSampleType, typename SmootherSampleType, typename SmoothingType>
-        const SIMDAudioBlock& replaceWithProductOf (SIMDAudioBlock<BlockSampleType> src, juce::SmoothedValue<SmootherSampleType, SmoothingType>& value) const noexcept
+        const SIMDAudioBlock& replaceWithProductOf (SIMDAudioBlock<BlockSampleType> src, SmoothedValue<SmootherSampleType, SmoothingType>& value) const noexcept
         {
             replaceWithProductOfInternal (src, value);
             return *this;
@@ -494,16 +495,16 @@ namespace MarsDSP::Utils::Buffers {
             return *this;
         }
         
-        juce::Range<typename std::remove_const<NumericType>::type> findMinAndMax() const noexcept
+        Range<typename std::remove_const<NumericType>::type> findMinAndMax() const noexcept
         {
             if (numChannels == 0)
                 return {};
 
             auto n = numSamples * sizeFactor;
-            auto minmax = juce::FloatVectorOperations::findMinAndMax (getDataPointer (0), n);
+            auto minmax = FloatVectorOperations::findMinAndMax (getDataPointer (0), n);
 
             for (size_t ch = 1; ch < numChannels; ++ch)
-                minmax = minmax.getUnionWith (juce::FloatVectorOperations::findMinAndMax (getDataPointer (ch), n));
+                minmax = minmax.getUnionWith (FloatVectorOperations::findMinAndMax (getDataPointer (ch), n));
 
             return minmax;
         }
@@ -527,12 +528,12 @@ namespace MarsDSP::Utils::Buffers {
         const SIMDAudioBlock& operator*= (SIMDAudioBlock src) const noexcept { return multiplyBy (src); }
 
         template <typename OtherSampleType, typename SmoothingType>
-        SIMDAudioBlock& operator*= (juce::SmoothedValue<OtherSampleType, SmoothingType>& value) noexcept
+        SIMDAudioBlock& operator*= (SmoothedValue<OtherSampleType, SmoothingType>& value) noexcept
         {
             return multiplyBy (value);
         }
         template <typename OtherSampleType, typename SmoothingType>
-        const SIMDAudioBlock& operator*= (juce::SmoothedValue<OtherSampleType, SmoothingType>& value) const noexcept
+        const SIMDAudioBlock& operator*= (SmoothedValue<OtherSampleType, SmoothingType>& value) const noexcept
         {
             return multiplyBy (value);
         }
@@ -571,7 +572,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = numSamples * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::clear (getDataPointer (ch), n);
+                FloatVectorOperations::clear (getDataPointer (ch), n);
         }
 
         void JUCE_VECTOR_CALLTYPE fillInternal (NumericType value) const noexcept
@@ -579,7 +580,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = numSamples * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::fill (getDataPointer (ch), value, n);
+                FloatVectorOperations::fill (getDataPointer (ch), value, n);
         }
 
         template <typename OtherSampleType>
@@ -589,18 +590,18 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (src.numSamples * src.sizeFactor, numSamples * sizeFactor);
 
             for (size_t ch = 0; ch < maxChannels; ++ch)
-                juce::FloatVectorOperations::copy (getDataPointer (ch), src.getDataPointer (ch), n);
+                FloatVectorOperations::copy (getDataPointer (ch), src.getDataPointer (ch), n);
         }
 
         template <typename OtherNumericType>
-        void copyFromInternal (const juce::AudioBuffer<OtherNumericType>& src, size_t srcPos, size_t dstPos, size_t numElements) const
+        void copyFromInternal (const AudioBuffer<OtherNumericType>& src, size_t srcPos, size_t dstPos, size_t numElements) const
         {
             auto srclen = static_cast<size_t> (src.getNumSamples()) / sizeFactor;
-            auto n = juce::jmin (srclen - srcPos, numSamples - dstPos, numElements) * sizeFactor;
-            auto maxChannels = juce::jmin (static_cast<size_t> (src.getNumChannels()), static_cast<size_t> (numChannels));
+            auto n = jmin (srclen - srcPos, numSamples - dstPos, numElements) * sizeFactor;
+            auto maxChannels = jmin (static_cast<size_t> (src.getNumChannels()), static_cast<size_t> (numChannels));
 
             for (size_t ch = 0; ch < maxChannels; ++ch)
-                juce::FloatVectorOperations::copy (getDataPointer (ch) + (dstPos * sizeFactor),
+                FloatVectorOperations::copy (getDataPointer (ch) + (dstPos * sizeFactor),
                                                    src.getReadPointer (static_cast<int> (ch), static_cast<int> (srcPos * sizeFactor)),
                                                    n);
         }
@@ -608,7 +609,7 @@ namespace MarsDSP::Utils::Buffers {
         void moveInternal (size_t srcPos, size_t dstPos, size_t numElements = std::numeric_limits<size_t>::max()) const noexcept
         {
             jassert (srcPos <= numSamples && dstPos <= numSamples);
-            auto len = juce::jmin (numSamples - srcPos, numSamples - dstPos, numElements) * sizeof (SampleType);
+            auto len = jmin (numSamples - srcPos, numSamples - dstPos, numElements) * sizeof (SampleType);
 
             if (len != 0)
                 for (size_t ch = 0; ch < numChannels; ++ch)
@@ -622,7 +623,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = numSamples * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::add (getDataPointer (ch), value, n);
+                FloatVectorOperations::add (getDataPointer (ch), value, n);
         }
 
         template <typename OtherSampleType>
@@ -632,7 +633,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::add (getDataPointer (ch), src.getDataPointer (ch), n);
+                FloatVectorOperations::add (getDataPointer (ch), src.getDataPointer (ch), n);
         }
 
         template <typename OtherSampleType>
@@ -642,7 +643,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::add (getDataPointer (ch), src.getDataPointer (ch), value, n);
+                FloatVectorOperations::add (getDataPointer (ch), src.getDataPointer (ch), value, n);
         }
 
         template <typename Src1SampleType, typename Src2SampleType>
@@ -652,7 +653,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src1.numSamples, src2.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::add (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
+                FloatVectorOperations::add (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
         }
 
         constexpr void JUCE_VECTOR_CALLTYPE subtractInternal (NumericType value) const noexcept
@@ -667,7 +668,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::subtract (getDataPointer (ch), src.getDataPointer (ch), n);
+                FloatVectorOperations::subtract (getDataPointer (ch), src.getDataPointer (ch), n);
         }
 
         template <typename OtherSampleType>
@@ -683,7 +684,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src1.numSamples, src2.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::subtract (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
+                FloatVectorOperations::subtract (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
         }
 
         void JUCE_VECTOR_CALLTYPE multiplyByInternal (NumericType value) const noexcept
@@ -691,7 +692,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = numSamples * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::multiply (getDataPointer (ch), value, n);
+                FloatVectorOperations::multiply (getDataPointer (ch), value, n);
         }
 
         template <typename OtherSampleType>
@@ -701,7 +702,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::multiply (getDataPointer (ch), src.getDataPointer (ch), n);
+                FloatVectorOperations::multiply (getDataPointer (ch), src.getDataPointer (ch), n);
         }
 
         template <typename OtherSampleType>
@@ -711,7 +712,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::multiply (getDataPointer (ch), src.getDataPointer (ch), value, n);
+                FloatVectorOperations::multiply (getDataPointer (ch), src.getDataPointer (ch), value, n);
         }
 
         template <typename Src1SampleType, typename Src2SampleType>
@@ -721,11 +722,11 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src1.numSamples, src2.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::multiply (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
+                FloatVectorOperations::multiply (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
         }
 
         template <typename OtherSampleType, typename SmoothingType>
-        void multiplyByInternal (juce::SmoothedValue<OtherSampleType, SmoothingType>& value) const noexcept
+        void multiplyByInternal (SmoothedValue<OtherSampleType, SmoothingType>& value) const noexcept
         {
             if (! value.isSmoothing())
             {
@@ -773,7 +774,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::addWithMultiply (getDataPointer (ch), src.getDataPointer (ch), factor, n);
+                FloatVectorOperations::addWithMultiply (getDataPointer (ch), src.getDataPointer (ch), factor, n);
         }
 
         template <typename Src1SampleType, typename Src2SampleType>
@@ -783,7 +784,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src1.numSamples, src2.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::addWithMultiply (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
+                FloatVectorOperations::addWithMultiply (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
         }
 
         constexpr void negateInternal() const noexcept
@@ -798,7 +799,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::negate (getDataPointer (ch), src.getDataPointer (ch), n);
+                FloatVectorOperations::negate (getDataPointer (ch), src.getDataPointer (ch), n);
         }
 
         template <typename OtherSampleType>
@@ -808,7 +809,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (numSamples, src.numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::abs (getDataPointer (ch), src.getDataPointer (ch), n);
+                FloatVectorOperations::abs (getDataPointer (ch), src.getDataPointer (ch), n);
         }
 
         template <typename Src1SampleType, typename Src2SampleType>
@@ -818,7 +819,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (src1.numSamples, src2.numSamples, numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::min (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
+                FloatVectorOperations::min (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
         }
 
         template <typename Src1SampleType, typename Src2SampleType>
@@ -828,7 +829,7 @@ namespace MarsDSP::Utils::Buffers {
             auto n = juce::jmin (src1.numSamples, src2.numSamples, numSamples) * sizeFactor;
 
             for (size_t ch = 0; ch < numChannels; ++ch)
-                juce::FloatVectorOperations::max (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
+                FloatVectorOperations::max (getDataPointer (ch), src1.getDataPointer (ch), src2.getDataPointer (ch), n);
         }
 
         using ChannelCountType = unsigned int;
@@ -856,8 +857,8 @@ namespace MarsDSP::Utils::Buffers {
 
         using SampleType = ContextSampleType;
         
-        using AudioBlockType = juce::dsp::AudioBlock<SampleType>;
-        using ConstAudioBlockType = juce::dsp::AudioBlock<const SampleType>;
+        using AudioBlockType = dsp::AudioBlock<SampleType>;
+        using ConstAudioBlockType = dsp::AudioBlock<const SampleType>;
 
         explicit ProcessContextReplacing (AudioBlockType& block) noexcept : ioBlock (block) {}
 
@@ -881,8 +882,8 @@ namespace MarsDSP::Utils::Buffers {
     public:
         
         using SampleType = ContextSampleType;
-        using AudioBlockType = juce::dsp::AudioBlock<SampleType>;
-        using ConstAudioBlockType = juce::dsp::AudioBlock<const SampleType>;
+        using AudioBlockType = dsp::AudioBlock<SampleType>;
+        using ConstAudioBlockType = dsp::AudioBlock<const SampleType>;
 
         ProcessContextNonReplacing (const ConstAudioBlockType& input, AudioBlockType& output) noexcept
             : inputBlock (input), outputBlock (output)

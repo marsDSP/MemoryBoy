@@ -21,7 +21,7 @@ namespace MarsDSP::Buffers
     #if ! MARSDSP_NO_XSIMD
         static constexpr auto vectorSize = static_cast<int>(xsimd::batch<SampleType>::size);
         if constexpr (std::is_floating_point_v<SampleType>)
-            numSamplesPadded = buffers_detail::ceiling_divide (numSamples, vectorSize) * vectorSize;
+            numSamplesPadded = ceiling_divide (numSamples, vectorSize) * vectorSize;
     #endif
 
         rawData.clear();

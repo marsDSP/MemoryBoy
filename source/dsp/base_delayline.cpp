@@ -14,7 +14,7 @@ namespace MarsDSP::DSP
     {
         jassert(maximumDelayInSamples >= 0);
 
-        totalSize = juce::jmax(4, maximumDelayInSamples + 1);
+        totalSize = jmax(4, maximumDelayInSamples + 1);
     }
 
     //==============================================================================

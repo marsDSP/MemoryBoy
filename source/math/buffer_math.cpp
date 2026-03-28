@@ -11,7 +11,7 @@ namespace MarsDSP::Math::BufferMath
         if (numSamples < 0)
             numSamples = buffer.getNumSamples() - startSample;
 
-        using SampleType = Buffers::BufferSampleType<BufferType>;
+        using SampleType = BufferSampleType<BufferType>;
         auto getChannelMagnitude = [&buffer, startSample, numSamples] (int ch)
         {
             const auto* channelData = buffer.getReadPointer (ch);
@@ -47,7 +47,7 @@ namespace MarsDSP::Math::BufferMath
     template <typename BufferType>
     auto getRMSLevel (const BufferType& buffer, int channel, int startSample, int numSamples) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType>;
+        using SampleType = BufferSampleType<BufferType>;
 
         if (numSamples < 0)
             numSamples = buffer.getNumSamples() - startSample;
@@ -80,8 +80,8 @@ namespace MarsDSP::Math::BufferMath
     template <typename BufferType1, typename BufferType2>
     void copyBufferData (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcStartSample, int destStartSample, int numSamples, int startChannel, int numChannels) noexcept
     {
-        using SampleType1 = Buffers::BufferSampleType<BufferType1>;
-        using SampleType2 = Buffers::BufferSampleType<BufferType2>;
+        using SampleType1 = BufferSampleType<BufferType1>;
+        using SampleType2 = BufferSampleType<BufferType2>;
         static_assert (std::is_same_v<SampleType1, SampleType2> || (std::is_floating_point_v<SampleType1> && std::is_floating_point_v<SampleType2>),
                        "Both buffer types must have the same sample type!");
 
@@ -105,8 +105,6 @@ namespace MarsDSP::Math::BufferMath
             const auto* srcData = bufferSrc.getReadPointer (ch);
             auto* destData = bufferDest.getWritePointer (ch);
 
-
-
             jassert (destData != nullptr);
             jassert (srcData != nullptr);
 
@@ -119,8 +117,8 @@ namespace MarsDSP::Math::BufferMath
     template <typename BufferType1, typename BufferType2>
     void copyBufferChannels (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcChannel, int destChannel) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         jassert (bufferSrc.getNumSamples() == bufferDest.getNumSamples());
@@ -142,8 +140,8 @@ namespace MarsDSP::Math::BufferMath
     template <typename BufferType1, typename BufferType2>
     void addBufferData (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcStartSample, int destStartSample, int numSamples, int startChannel, int numChannels) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>, "Both buffer types must have the same sample type!");
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>, "Both buffer types must have the same sample type!");
 
         if (numSamples < 0)
         {
@@ -181,12 +179,14 @@ namespace MarsDSP::Math::BufferMath
         }
     }
 
-
     template <typename BufferType1, typename BufferType2>
-    void addBufferChannels (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcChannel, int destChannel) noexcept
+    void addBufferChannels (const BufferType1& bufferSrc,
+                                  BufferType2& bufferDest,
+                                  int srcChannel,
+                                  int destChannel) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         jassert (bufferSrc.getNumSamples() == bufferDest.getNumSamples());
@@ -211,10 +211,16 @@ namespace MarsDSP::Math::BufferMath
     }
 
     template <typename BufferType1, typename BufferType2>
-    void multiplyBufferData (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcStartSample, int destStartSample, int numSamples, int startChannel, int numChannels) noexcept
+    void multiplyBufferData (const BufferType1& bufferSrc,
+                                   BufferType2& bufferDest,
+                                   int srcStartSample,
+                                   int destStartSample,
+                                   int numSamples,
+                                   int startChannel,
+                                   int numChannels) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         if (numSamples < 0)
@@ -262,8 +268,8 @@ namespace MarsDSP::Math::BufferMath
     template <typename BufferType1, typename BufferType2, typename FloatType>
     void applyGain (const BufferType1& bufferSrc, BufferType2& bufferDest, FloatType gain) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         const auto numChannels = bufferSrc.getNumChannels();
@@ -305,8 +311,8 @@ namespace MarsDSP::Math::BufferMath
             return;
         }
 
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         const auto numChannels = bufferSrc.getNumChannels();
@@ -342,13 +348,12 @@ namespace MarsDSP::Math::BufferMath
             return;
         }
 
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         const auto numChannels = bufferSrc.getNumChannels();
         const auto numSamples = bufferSrc.getNumSamples();
-
 
         jassert (bufferDest.getNumChannels() == numChannels);
         jassert (bufferDest.getNumSamples() == numSamples);
@@ -370,13 +375,12 @@ namespace MarsDSP::Math::BufferMath
     template <typename BufferType1, typename BufferType2, typename FloatType>
     void sumToMono (const BufferType1& bufferSrc, BufferType2& bufferDest, FloatType normGain)
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         const auto numInChannels = bufferSrc.getNumChannels();
         [[maybe_unused]] const auto numSamples = bufferSrc.getNumSamples();
-
 
         jassert (bufferDest.getNumSamples() == numSamples);
 
@@ -388,7 +392,6 @@ namespace MarsDSP::Math::BufferMath
 
         for (int ch = 1; ch < numInChannels; ++ch)
             addBufferChannels (bufferSrc, bufferDest, ch, 0);
-
 
         if (! juce::exactlyEqual (normGain, static_cast<FloatType>(1)))
         {
@@ -411,13 +414,13 @@ namespace MarsDSP::Math::BufferMath
     }
 
     template <typename BufferType, typename FloatType>
-    bool sanitizeBuffer (BufferType& buffer, FloatType ceiling) noexcept
+    bool sanitizeBuffer (BufferType& buffer, FloatType ceiling) noexcept // this is always true! surely this is unintended
     {
         const auto numChannels = buffer.getNumChannels();
         const auto numSamples = buffer.getNumSamples();
 
         bool needsClear = false;
-        for (int ch = 0; ch < numChannels; ++ch)
+        for (int ch = 0; ch < numChannels; ++ch) // this needs work!!!!
         {
             const auto* channelData = buffer.getReadPointer (ch);
             const auto channelMax = FloatVectorOperations::findAbsoluteMaximum (channelData, numSamples);
@@ -431,10 +434,10 @@ namespace MarsDSP::Math::BufferMath
             }
         }
 
-        if (needsClear)
+        if (needsClear) // whats going on here??
             buffer.clear();
 
-        return ! needsClear;
+        return ! needsClear; // and here??
     }
 
     template <typename BufferType, typename FunctionType>
@@ -446,8 +449,8 @@ namespace MarsDSP::Math::BufferMath
     template <typename BufferType1, typename BufferType2, typename FunctionType>
     void applyFunction (const BufferType1& bufferSrc, BufferType2& bufferDest, FunctionType&& function) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         const auto numChannels = bufferSrc.getNumChannels();
@@ -491,13 +494,12 @@ namespace MarsDSP::Math::BufferMath
     std::enable_if_t<std::is_floating_point_v<FloatType>, void>
         applyFunctionSIMD (const BufferType1& bufferSrc, BufferType2& bufferDest, SIMDFunctionType&& simdFunction, ScalarFunctionType&& scalarFunction) noexcept
     {
-        using SampleType = Buffers::BufferSampleType<BufferType1>;
-        static_assert (std::is_same_v<SampleType, Buffers::BufferSampleType<BufferType2>>,
+        using SampleType = BufferSampleType<BufferType1>;
+        static_assert (std::is_same_v<SampleType, BufferSampleType<BufferType2>>,
         "Both buffer types must have the same sample type!");
 
         const auto numChannels = bufferSrc.getNumChannels();
         const auto numSamples = bufferSrc.getNumSamples();
-
 
         jassert (bufferDest.getNumChannels() == numChannels);
         jassert (bufferDest.getNumSamples() == numSamples);

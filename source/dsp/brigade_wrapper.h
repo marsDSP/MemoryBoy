@@ -43,7 +43,7 @@ namespace MarsDSP::DSP
 
         [[nodiscard]] float getDelay() const final { return delaySamp; }
 
-        void prepare(const juce::dsp::ProcessSpec &spec) final
+        void prepare(const dsp::ProcessSpec &spec) final
         {
             sampleRate = static_cast<float>(spec.sampleRate);
             inputs.resize(spec.numChannels, 0.0f);

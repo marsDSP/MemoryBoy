@@ -59,8 +59,7 @@ inline namespace BufferMath
         }
     };
 
-
-    struct FloatVectorOperations : public juce::FloatVectorOperations
+    struct FloatVectorOperations : juce::FloatVectorOperations
     {
 
         using juce::FloatVectorOperations::add;
@@ -102,70 +101,53 @@ inline namespace BufferMath
         }
     };
 
-
     template <typename BufferType>
     auto getMagnitude (const BufferType& buffer, int startSample = 0, int numSamples = -1, int channel = -1) noexcept;
-
 
     template <typename BufferType>
     auto getRMSLevel (const BufferType& buffer, int channel, int startSample = 0, int numSamples = -1) noexcept;
 
-
     template <typename BufferType1, typename BufferType2 = BufferType1>
     void copyBufferData (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcStartSample = 0, int destStartSample = 0, int numSamples = -1, int startChannel = 0, int numChannels = -1) noexcept;
-
 
     template <typename BufferType1, typename BufferType2 = BufferType1>
     void copyBufferChannels (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcChannel, int destChannel) noexcept;
 
-
     template <typename BufferType1, typename BufferType2 = BufferType1>
     void addBufferData (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcStartSample = 0, int destStartSample = 0, int numSamples = -1, int startChannel = 0, int numChannels = -1) noexcept;
-
 
     template <typename BufferType1, typename BufferType2 = BufferType1>
     void addBufferChannels (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcChannel, int destChannel) noexcept;
 
-
     template <typename BufferType1, typename BufferType2 = BufferType1>
     void multiplyBufferData (const BufferType1& bufferSrc, BufferType2& bufferDest, int srcStartSample = 0, int destStartSample = 0, int numSamples = -1, int startChannel = 0, int numChannels = -1) noexcept;
-
 
     template <typename BufferType, typename FloatType = BufferType::Type>
     void applyGain (BufferType& buffer, FloatType gain) noexcept;
 
-
     template <typename BufferType1, typename BufferType2 = BufferType1, typename FloatType = BufferType1::Type>
     void applyGain (const BufferType1& bufferSrc, BufferType2& bufferDest, FloatType gain) noexcept;
-
 
     template <typename BufferType, typename SmoothedValueType>
     void applyGainSmoothed (BufferType& buffer, SmoothedValueType& gain) noexcept;
 
-
     template <typename BufferType1, typename SmoothedValueType, typename BufferType2 = BufferType1>
     void applyGainSmoothed (const BufferType1& bufferSrc, BufferType2& bufferDest, SmoothedValueType& gain) noexcept;
-
 
     template <typename BufferType, typename SmoothedBufferType>
     void applyGainSmoothedBuffer (BufferType& buffer, SmoothedBufferType& gain) noexcept;
 
-
     template <typename BufferType1, typename SmoothedBufferType, typename BufferType2 = BufferType1>
     void applyGainSmoothedBuffer (const BufferType1& bufferSrc, BufferType2& bufferDest, SmoothedBufferType& gain) noexcept;
-
 
     template <typename BufferType1, typename BufferType2, typename FloatType = SampleTypeHelpers::NumericType<BufferSampleType<BufferType1>>>
     void sumToMono (const BufferType1& bufferSrc, BufferType2& bufferDest, FloatType normGain = static_cast<FloatType>(-1));
 
-
     template <typename BufferType, typename FloatType = BufferSampleType<BufferType>>
     bool sanitizeBuffer (BufferType& buffer, FloatType ceiling = static_cast<FloatType>(100)) noexcept;
 
-
     template <typename BufferType, typename FunctionType>
     void applyFunction (BufferType& buffer, FunctionType&& function) noexcept;
-
 
     template <typename BufferType1, typename BufferType2, typename FunctionType>
     void applyFunction (const BufferType1& bufferSrc, BufferType2& bufferDest, FunctionType&& function) noexcept;
@@ -175,26 +157,19 @@ inline namespace BufferMath
     template <typename BufferType, typename FunctionType, typename FloatType = BufferSampleType<BufferType>>
     std::enable_if_t<std::is_floating_point_v<FloatType>, void> applyFunctionSIMD (BufferType& buffer, FunctionType&& function) noexcept;
 
-
     template <typename BufferType1, typename BufferType2, typename FunctionType, typename FloatType = BufferSampleType<BufferType1>>
     std::enable_if_t<std::is_floating_point_v<FloatType>, void>
         applyFunctionSIMD (const BufferType1& bufferSrc, BufferType2& bufferDest, FunctionType&& function) noexcept;
-
 
     template <typename BufferType, typename SIMDFunctionType, typename ScalarFunctionType, typename FloatType = BufferSampleType<BufferType>>
     std::enable_if_t<std::is_floating_point_v<FloatType>, void>
         applyFunctionSIMD (BufferType& buffer, SIMDFunctionType&& simdFunction, ScalarFunctionType&& scalarFunction) noexcept;
 
-
     template <typename BufferType1, typename BufferType2, typename SIMDFunctionType, typename ScalarFunctionType, typename FloatType = BufferSampleType<BufferType1>>
     std::enable_if_t<std::is_floating_point_v<FloatType>, void>
         applyFunctionSIMD (const BufferType1& bufferSrc, BufferType2& bufferDest, SIMDFunctionType&& simdFunction, ScalarFunctionType&& scalarFunction) noexcept;
 #endif
-
 }
 }
-
 #include "buffer_math.cpp"
-
-
-#endif //MEMORYBOY_BUFFER_MATH_H
+#endif

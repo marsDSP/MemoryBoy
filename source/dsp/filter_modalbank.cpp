@@ -30,7 +30,7 @@ namespace MarsDSP::DSP
                                                                      const SampleType (&ampsImag)[maxNumModes],
                                                                      SampleType normalize)
     {
-        for (size_t i = 0; i < (size_t) maxNumModes; ++i)
+        for (size_t i = 0; i < maxNumModes; ++i)
             amplitudeData[i] = std::complex<SampleType>{ampsReal[i], ampsImag[i]};
 
         updateAmplitudeNormalizationFactor(normalize);

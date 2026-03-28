@@ -14,9 +14,7 @@ namespace MarsDSP::DSP
     {
     public:
         BucketBrigade() = default;
-
         BucketBrigade(BucketBrigade &&) noexcept = default;
-
         BucketBrigade &operator=(BucketBrigade &&) noexcept = default;
 
         void prepare(double sampleRate)
@@ -40,13 +38,11 @@ namespace MarsDSP::DSP
             std::fill(buffer.begin(), buffer.end(), 0.0f);
         }
 
-
         void setInputFilterFreq(float freqHz = BBDFilterSpec::inputFilterOriginalCutoff) const
         {
             inputFilter->set_freq(ALIEN ? freqHz * 0.2f : freqHz);
             inputFilter->set_time(tn);
         }
-
 
         void setOutputFilterFreq(float freqHz = BBDFilterSpec::outputFilterOriginalCutoff) const
         {
@@ -54,28 +50,26 @@ namespace MarsDSP::DSP
             outputFilter->set_time(tn);
         }
 
-
         void setDelayTime(float delaySec) noexcept
         {
-            delaySec = juce::jmax(Ts, delaySec - Ts);
+            delaySec = jmax(Ts, delaySec - Ts);
 
             const auto clock_rate_hz = (2.0f * static_cast<float>(STAGES)) / delaySec;
             Ts_bbd = 1.0f / clock_rate_hz;
 
 
-            Ts_bbd = juce::jmax(Ts * 0.01f, Ts_bbd);
+            Ts_bbd = jmax(Ts * 0.01f, Ts_bbd);
 
             const auto doubleTs = 2 * Ts_bbd;
             inputFilter->set_delta(doubleTs);
             outputFilter->set_delta(doubleTs);
         }
 
-
         template<bool A = ALIEN>
-        inline std::enable_if_t<A, float>
+        std::enable_if_t<A, float>
         process(float u) noexcept
         {
-            juce::ScopedNoDenormals noDenormals;
+            ScopedNoDenormals noDenormals;
             SIMDComplex<float> xOutAccum;
             float yBBD, delta;
             int iterations = 0;
@@ -108,12 +102,11 @@ namespace MarsDSP::DSP
             return H0 * yBBD_old + sumOut;
         }
 
-
         template<bool A = ALIEN>
-        inline std::enable_if_t<!A, float>
+        std::enable_if_t<!A, float>
         process(float u) noexcept
         {
-            juce::ScopedNoDenormals noDenormals;
+            ScopedNoDenormals noDenormals;
             SIMDComplex<float> xOutAccum{};
             float yBBD, delta;
             int iterations = 0;

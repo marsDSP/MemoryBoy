@@ -4,7 +4,6 @@
 #define MEMORYBOY_BASE_DELAYLINE_H
 
 #include <JuceHeader.h>
-
 #include "math/buffer_math.h"
 #include "utils/type_utils.h"
 
@@ -107,7 +106,7 @@ namespace MarsDSP::DSP
 
         //==============================================================================
         /** Initialises the processor. */
-        void prepare(const juce::dsp::ProcessSpec &spec) final;
+        void prepare(const dsp::ProcessSpec &spec) final;
 
         /** Frees internal memory. */
         void free() final;
@@ -124,7 +123,7 @@ namespace MarsDSP::DSP
 
             @see setDelay, popSample, process
         */
-        inline void pushSample(int channel, SampleType sample) noexcept final
+        void pushSample(int channel, SampleType sample) noexcept final
         {
             const auto writePtr = this->writePos[static_cast<size_t>(channel)];
             bufferPtrs[static_cast<size_t>(channel)][writePtr] = static_cast<StorageType>(sample);
@@ -141,7 +140,7 @@ namespace MarsDSP::DSP
 
             @see setDelay, pushSample, process
         */
-        inline SampleType popSample(int channel) noexcept final
+        SampleType popSample(int channel) noexcept final
         {
             auto result = interpolateSample(channel);
             incrementReadPointer(channel);
@@ -166,7 +165,7 @@ namespace MarsDSP::DSP
 
             @see setDelay, pushSample, process
         */
-        inline SampleType popSample(int channel, NumericType delayInSamples, bool updateReadPointer) noexcept final
+        SampleType popSample(int channel, NumericType delayInSamples, bool updateReadPointer) noexcept final
         {
             setDelay(delayInSamples);
 
@@ -179,7 +178,7 @@ namespace MarsDSP::DSP
         }
 
         /** Increment the read pointer without reading an interpolated sample (be careful...) */
-        inline void incrementReadPointer(int channel) noexcept final
+        void incrementReadPointer(int channel) noexcept final
         {
             auto newReadPtr = this->readPos[static_cast<size_t>(channel)] + totalSize - 1;
             newReadPtr = newReadPtr > totalSize ? newReadPtr - totalSize : newReadPtr;
@@ -265,5 +264,4 @@ namespace MarsDSP::DSP
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DelayLine)
     };
 } // namespace MarsDSP
-
 #endif

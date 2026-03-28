@@ -107,7 +107,6 @@ namespace MarsDSP::DSP
         Complex4 gCoef{};
     };
 
-
     class alignas (xsimd::default_arch::alignment()) OutputFilterBank
     {
         using T = float;

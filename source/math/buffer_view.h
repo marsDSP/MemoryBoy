@@ -157,7 +157,7 @@ namespace MarsDSP::Buffers
         }
 
 #if MARSDSP_USING_JUCE
-        BufferView(juce::AudioBuffer<std::remove_const_t<SampleType> > &buffer,
+        BufferView(AudioBuffer<std::remove_const_t<SampleType> > &buffer,
                    int sampleOffset = 0,
                    int bufferNumSamples = -1,
                    int startChannel = 0,
@@ -169,7 +169,7 @@ namespace MarsDSP::Buffers
         }
 
         template<typename T = SampleType, std::enable_if_t<std::is_const_v<T> >* = nullptr>
-        BufferView(const juce::AudioBuffer<std::remove_const_t<SampleType> > &buffer,
+        BufferView(const AudioBuffer<std::remove_const_t<SampleType> > &buffer,
                    int sampleOffset = 0,
                    int bufferNumSamples = -1,
                    int startChannel = 0,
@@ -180,8 +180,7 @@ namespace MarsDSP::Buffers
             initialise(buffer.getArrayOfReadPointers(), sampleOffset, startChannel);
         }
 
-
-        [[nodiscard]] juce::AudioBuffer<SampleType> toAudioBuffer() const noexcept
+        [[nodiscard]] AudioBuffer<SampleType> toAudioBuffer() const noexcept
         {
             return {channelPointers.data(), numChannels, numSamples};
         }
@@ -222,7 +221,6 @@ namespace MarsDSP::Buffers
                 channelPointers[ch] = block.getChannelPointer(ch + static_cast<size_t>(startChannel)) + sampleOffset;
         }
 
-
         [[nodiscard]] Utils::Buffers::AudioBlock<SampleType> toAudioBlock() const noexcept
         {
             return {channelPointers.data(), static_cast<size_t>(numChannels), static_cast<size_t>(numSamples)};
@@ -230,19 +228,15 @@ namespace MarsDSP::Buffers
 #endif
 #endif
 
-
         template<typename T = SampleType>
         std::enable_if_t<!std::is_const_v<T>, void> clear() const noexcept
         {
             buffers_detail::clear(const_cast<SampleType **>(channelPointers.data()), 0, numChannels, 0, numSamples);
         }
 
-
         [[nodiscard]] int getNumChannels() const noexcept { return numChannels; }
 
-
         [[nodiscard]] int getNumSamples() const noexcept { return numSamples; }
-
 
         template<typename T = SampleType>
         [[nodiscard]] std::enable_if_t<!std::is_const_v<T>, SampleType *> getWritePointer(int channel) const noexcept
@@ -250,12 +244,10 @@ namespace MarsDSP::Buffers
             return channelPointers[static_cast<size_t>(channel)];
         }
 
-
         [[nodiscard]] const SampleType *getReadPointer(int channel) const noexcept
         {
             return channelPointers[static_cast<size_t>(channel)];
         }
-
 
         template<typename T = SampleType>
         [[nodiscard]] std::enable_if_t<!std::is_const_v<T>, std::span<SampleType> > getWriteSpan(
@@ -264,12 +256,10 @@ namespace MarsDSP::Buffers
             return {channelPointers[static_cast<size_t>(channel)], static_cast<size_t>(numSamples)};
         }
 
-
         [[nodiscard]] std::span<const SampleType> getReadSpan(int channel) const noexcept
         {
             return {channelPointers[static_cast<size_t>(channel)], static_cast<size_t>(numSamples)};
         }
-
 
         template<typename T = SampleType>
         [[nodiscard]] std::enable_if_t<!std::is_const_v<T>, SampleType * const*>
@@ -277,7 +267,6 @@ namespace MarsDSP::Buffers
         {
             return channelPointers.data();
         }
-
 
         [[nodiscard]] const SampleType *const*getArrayOfReadPointers() const noexcept
         {
@@ -308,7 +297,6 @@ namespace MarsDSP::Buffers
         int numChannels = 1;
         int numSamples = 0;
 
-
         static constexpr int maxNumChannels = MARSDSP_BUFFER_MAX_NUM_CHANNELS;
         std::array<SampleType *, static_cast<size_t>(maxNumChannels)> channelPointers{};
     };
@@ -316,7 +304,7 @@ namespace MarsDSP::Buffers
 #ifndef DOXYGEN
     namespace detail
     {
-        template<typename BufferType, typename SampleType>
+        template<typename BufferType, typename SampleType> // investigate why these are never used
         struct is_static_buffer
         {
             static constexpr bool value = false;
@@ -336,20 +324,18 @@ namespace MarsDSP::Buffers
     }
 #endif
 
-
     template<typename BufferType,
         typename... Ts,
         typename = std::enable_if_t<
             std::is_same_v<BufferType, SIMDBuffer<float> > || detail::is_static_buffer_v<BufferType, float>
 #if MARSDSP_USING_JUCE
-            || std::is_same_v<BufferType, juce::AudioBuffer<float> >
+            || std::is_same_v<BufferType, AudioBuffer<float> >
 #if JUCE_MODULE_AVAILABLE_juce_dsp
-            || std::is_same_v<BufferType, juce::dsp::AudioBlock<float> >
+            || std::is_same_v<BufferType, dsp::AudioBlock<float> >
 #endif
 #endif
         > >
     BufferView(BufferType &, Ts...) -> BufferView<float>;
-
 
     template<typename BufferType,
         typename... Ts,
@@ -357,28 +343,26 @@ namespace MarsDSP::Buffers
             std::is_same_v<BufferType, const SIMDBuffer<float>> || (
                 std::is_const_v<BufferType> && detail::is_static_buffer_v<std::remove_const_t<BufferType>, float>)
 #if MARSDSP_USING_JUCE
-            || std::is_same_v<BufferType, const juce::AudioBuffer<float>>
+            || std::is_same_v<BufferType, const AudioBuffer<float>>
 #if JUCE_MODULE_AVAILABLE_juce_dsp
-            || std::is_same_v<std::remove_const_t<BufferType>, juce::dsp::AudioBlock<const float> >
+            || std::is_same_v<std::remove_const_t<BufferType>, dsp::AudioBlock<const float> >
 #endif
 #endif
         > >
     BufferView(BufferType &, Ts...) -> BufferView<const float>;
-
 
     template<typename BufferType,
         typename... Ts,
         typename = std::enable_if_t<
             std::is_same_v<BufferType, SIMDBuffer<double> > || detail::is_static_buffer_v<BufferType, double>
 #if MARSDSP_USING_JUCE
-            || std::is_same_v<BufferType, juce::AudioBuffer<double> >
+            || std::is_same_v<BufferType, AudioBuffer<double> >
 #if JUCE_MODULE_AVAILABLE_juce_dsp
-            || std::is_same_v<BufferType, juce::dsp::AudioBlock<double> >
+            || std::is_same_v<BufferType, dsp::AudioBlock<double> >
 #endif
 #endif
         > >
     BufferView(BufferType &, Ts...) -> BufferView<double>;
-
 
     template<typename BufferType,
         typename... Ts,
@@ -386,9 +370,9 @@ namespace MarsDSP::Buffers
             std::is_same_v<BufferType, const SIMDBuffer<double>> || (
                 std::is_const_v<BufferType> && detail::is_static_buffer_v<std::remove_const_t<BufferType>, double>)
 #if MARSDSP_USING_JUCE
-            || std::is_same_v<BufferType, const juce::AudioBuffer<double>>
+            || std::is_same_v<BufferType, const AudioBuffer<double>>
 #if JUCE_MODULE_AVAILABLE_juce_dsp
-            || std::is_same_v<std::remove_const_t<BufferType>, juce::dsp::AudioBlock<const double> >
+            || std::is_same_v<std::remove_const_t<BufferType>, dsp::AudioBlock<const double> >
 #endif
 #endif
         > >
@@ -403,7 +387,6 @@ namespace MarsDSP::Buffers
                 xsimd::batch<float> >> >
     BufferView(BufferType &, Ts...) -> BufferView<xsimd::batch<float> >;
 
-
     template<typename BufferType,
         typename... Ts,
         typename = std::enable_if_t<
@@ -412,14 +395,12 @@ namespace MarsDSP::Buffers
                     float> >)> >
     BufferView(BufferType &, Ts...) -> BufferView<const xsimd::batch<float>>;
 
-
     template<typename BufferType,
         typename... Ts,
         typename = std::enable_if_t<
             std::is_same_v<BufferType, SIMDBuffer<xsimd::batch<double> > > || detail::is_static_buffer_v<BufferType,
                 xsimd::batch<double> >> >
     BufferView(BufferType &, Ts...) -> BufferView<xsimd::batch<double> >;
-
 
     template<typename BufferType,
         typename... Ts,

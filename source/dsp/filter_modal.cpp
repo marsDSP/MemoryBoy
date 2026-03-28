@@ -47,6 +47,5 @@ namespace MarsDSP::DSP::Modal
 
     template class ModalFilter<xsimd::batch<float> >;
     template class ModalFilter<xsimd::batch<double> >;
-
 #endif
 }

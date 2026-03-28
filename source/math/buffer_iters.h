@@ -19,8 +19,8 @@ namespace MarsDSP::Buffers {
         auto getWriteSpan (BufferType& buffer, int channelIndex)
         {
 #if MARSDSP_USING_JUCE
-            if constexpr (std::is_same_v<BufferType, juce::AudioBuffer<float>> ||
-                          std::is_same_v<BufferType, juce::AudioBuffer<double>>)
+            if constexpr (std::is_same_v<BufferType, AudioBuffer<float>> ||
+                          std::is_same_v<BufferType, AudioBuffer<double>>)
                 return std::span { buffer.getWritePointer (channelIndex), static_cast<size_t> (buffer.getNumSamples()) };
             else
 #endif
@@ -31,8 +31,8 @@ namespace MarsDSP::Buffers {
         auto getWriteSubSpan (BufferType& buffer, int channelIndex, int start, size_t size)
         {
 #if MARSDSP_USING_JUCE
-            if constexpr (std::is_same_v<BufferType, juce::AudioBuffer<float>> ||
-                          std::is_same_v<BufferType, juce::AudioBuffer<double>>)
+            if constexpr (std::is_same_v<BufferType, AudioBuffer<float>> ||
+                          std::is_same_v<BufferType, AudioBuffer<double>>)
                 return std::span { buffer.getWritePointer (channelIndex) + start, size };
             else
 #endif
@@ -43,8 +43,8 @@ namespace MarsDSP::Buffers {
         auto getReadSpan (BufferType& buffer, int channelIndex)
         {
 #if MARSDSP_USING_JUCE
-            if constexpr (std::is_same_v<BufferType, const juce::AudioBuffer<float>> ||
-                          std::is_same_v<BufferType, const juce::AudioBuffer<double>>)
+            if constexpr (std::is_same_v<BufferType, const AudioBuffer<float>> ||
+                          std::is_same_v<BufferType, const AudioBuffer<double>>)
                 return std::span { buffer.getReadPointer (channelIndex), static_cast<size_t> (buffer.getNumSamples()) };
             else
 #endif
@@ -55,8 +55,8 @@ namespace MarsDSP::Buffers {
         auto getReadSubSpan (BufferType& buffer, int channelIndex, int start, size_t size)
         {
 #if MARSDSP_USING_JUCE
-            if constexpr (std::is_same_v<BufferType, const juce::AudioBuffer<float>> ||
-                          std::is_same_v<BufferType, const juce::AudioBuffer<double>>)
+            if constexpr (std::is_same_v<BufferType, const AudioBuffer<float>> ||
+                          std::is_same_v<BufferType, const AudioBuffer<double>>)
                 return std::span { buffer.getReadPointer (channelIndex) + start, size };
             else
 #endif
@@ -137,14 +137,14 @@ namespace MarsDSP::Buffers {
                     ++channelIndex;
                     if (channelIndex == buffer.getNumChannels())
                     {
-                        samplesRemaining = juce::jmax (samplesRemaining - subBlockSize, 0);
+                        samplesRemaining = jmax (samplesRemaining - subBlockSize, 0);
                         if (samplesRemaining > 0)
                             channelIndex = 0;
                     }
                 }
                 else
                 {
-                    samplesRemaining = juce::jmax (samplesRemaining - subBlockSize, 0);
+                    samplesRemaining = jmax (samplesRemaining - subBlockSize, 0);
                     if (samplesRemaining == 0)
                     {
                         ++channelIndex;
@@ -157,7 +157,7 @@ namespace MarsDSP::Buffers {
             auto operator*() const
             {
                 const auto startSample = buffer.getNumSamples() - samplesRemaining;
-                const auto activeSubBlockSize = static_cast<size_t> (juce::jmin (subBlockSize, samplesRemaining));
+                const auto activeSubBlockSize = static_cast<size_t> (jmin (subBlockSize, samplesRemaining));
                 return std::make_tuple (channelIndex,
                                         startSample,
                                         detail::getSubSpan (buffer, channelIndex, startSample, activeSubBlockSize));
@@ -204,7 +204,7 @@ namespace MarsDSP::Buffers {
 #if MARSDSP_NO_XSIMD
             alignas (16) SampleType channelData[MARSDSP_BUFFER_MAX_NUM_CHANNELS] {};
 #else
-            using NumericType = MarsDSP::Utils::SampleTypeHelpers::NumericType<SampleType>;
+            using NumericType = Utils::SampleTypeHelpers::NumericType<SampleType>;
             alignas (xsimd::batch<NumericType>::arch_type::alignment())
             SampleType channelData[MARSDSP_BUFFER_MAX_NUM_CHANNELS] {};
 #endif

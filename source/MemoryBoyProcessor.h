@@ -46,16 +46,20 @@ public:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void prepareProcessingState (double sampleRate, int samplesPerBlock, juce::uint32 numChannels);
     void updateProcessingParameters();
 
     //==============================================================================
     juce::AudioProcessorValueTreeState parameters;
     MarsDSP::DSP::BBDWrapper<4096> brigadeDelay;
     std::vector<float> feedbackSamples;
+    int preparedBlockSize = 0;
+    juce::uint32 preparedNumChannels = 0;
 
     std::atomic<float>* delayMsParameter = nullptr;
     std::atomic<float>* feedbackParameter = nullptr;
     std::atomic<float>* mixParameter = nullptr;
+    std::atomic<float>* modParameter = nullptr;
     std::atomic<float>* inputFilterParameter = nullptr;
     std::atomic<float>* outputFilterParameter = nullptr;
 

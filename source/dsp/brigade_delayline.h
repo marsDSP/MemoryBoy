@@ -5,6 +5,7 @@
 
 #include <JuceHeader.h>
 #include "brigade_filterbank.h"
+#include "ou_process.h"
 #include "math/buffer_math.h"
 
 namespace MarsDSP::DSP
@@ -17,7 +18,7 @@ namespace MarsDSP::DSP
         BucketBrigade(BucketBrigade &&) noexcept = default;
         BucketBrigade &operator=(BucketBrigade &&) noexcept = default;
 
-        void prepare(double sampleRate)
+        void prepare(double sampleRate, juce::uint32 maximumBlockSize)
         {
             FS = static_cast<float>(sampleRate);
             Ts = 1.0f / FS;
@@ -29,6 +30,10 @@ namespace MarsDSP::DSP
             outputFilter = std::make_unique<OutputFilterBank>(Ts);
             H0 = outputFilter->calcH0();
 
+            tapDrift.prepare(sampleRate, static_cast<int>(juce::jmax<juce::uint32>(maximumBlockSize, 1u)), 1);
+            tapDrift.prepareBlock(0.0f, 1);
+            modulationSampleIndex = 0;
+
             reset();
         }
 
@@ -36,6 +41,11 @@ namespace MarsDSP::DSP
         {
             bufferPtr = 0;
             std::fill(buffer.begin(), buffer.end(), 0.0f);
+            yBBD_old = 0.0f;
+            tn = 0.0f;
+            evenOn = true;
+            modulationSampleIndex = 0;
+            tapDrift.reset();
         }
 
         void setInputFilterFreq(float freqHz = BBDFilterSpec::inputFilterOriginalCutoff) const
@@ -52,17 +62,15 @@ namespace MarsDSP::DSP
 
         void setDelayTime(float delaySec) noexcept
         {
-            delaySec = jmax(Ts, delaySec - Ts);
+            baseDelaySec = juce::jmax(Ts, delaySec - Ts);
+            updateClockDelta(baseDelaySec);
+        }
 
-            const auto clock_rate_hz = (2.0f * static_cast<float>(STAGES)) / delaySec;
-            Ts_bbd = 1.0f / clock_rate_hz;
-
-
-            Ts_bbd = jmax(Ts * 0.01f, Ts_bbd);
-
-            const auto doubleTs = 2 * Ts_bbd;
-            inputFilter->set_delta(doubleTs);
-            outputFilter->set_delta(doubleTs);
+        void prepareModulationBlock(float amount, int numSamples)
+        {
+            modulationAmount = juce::jlimit(0.0f, 1.0f, amount);
+            modulationSampleIndex = 0;
+            tapDrift.prepareBlock(modulationAmount, juce::jmax(numSamples, 1));
         }
 
         template<bool A = ALIEN>
@@ -70,6 +78,7 @@ namespace MarsDSP::DSP
         process(float u) noexcept
         {
             ScopedNoDenormals noDenormals;
+            applyTapModulation();
             SIMDComplex<float> xOutAccum;
             float yBBD, delta;
             int iterations = 0;
@@ -107,6 +116,7 @@ namespace MarsDSP::DSP
         process(float u) noexcept
         {
             ScopedNoDenormals noDenormals;
+            applyTapModulation();
             SIMDComplex<float> xOutAccum{};
             float yBBD, delta;
             int iterations = 0;
@@ -140,13 +150,42 @@ namespace MarsDSP::DSP
         }
 
     private:
+        void updateClockDelta(float delaySec) noexcept
+        {
+            const auto clockRateHz = (2.0f * static_cast<float>(STAGES)) / juce::jmax(delaySec, Ts);
+            Ts_bbd = 1.0f / clockRateHz;
+            Ts_bbd = juce::jmax(Ts * 0.01f, Ts_bbd);
+
+            const auto doubleTs = 2.0f * Ts_bbd;
+            inputFilter->set_delta(doubleTs);
+            outputFilter->set_delta(doubleTs);
+        }
+
+        void applyTapModulation() noexcept
+        {
+            if (modulationAmount <= 0.0f)
+                return;
+
+            constexpr auto maxDelayDrift = 0.12f;
+
+            const auto drift = tapDrift.process(modulationSampleIndex++, 0);
+            const auto driftRatio = juce::jlimit(0.8f,
+                                                 1.2f,
+                                                 1.0f + drift * maxDelayDrift);
+            updateClockDelta(baseDelaySec * driftRatio);
+        }
+
         float FS = 48000.0f;
         float Ts = 1.0f / FS;
         float Ts_bbd = Ts;
+        float baseDelaySec = Ts;
+        float modulationAmount = 0.0f;
+        int modulationSampleIndex = 0;
 
         std::unique_ptr<InputFilterBank> inputFilter;
         std::unique_ptr<OutputFilterBank> outputFilter;
         float H0 = 1.0f;
+        OUProcess tapDrift;
 
         std::array<float, STAGES + 1> buffer;
         size_t bufferPtr = 0;

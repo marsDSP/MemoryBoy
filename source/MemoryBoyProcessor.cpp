@@ -6,6 +6,7 @@ namespace
     constexpr auto delayMsParameterId = "delayMs";
     constexpr auto feedbackParameterId = "feedback";
     constexpr auto mixParameterId = "mix";
+    constexpr auto modParameterId = "mod";
     constexpr auto inputFilterParameterId = "inputFilterHz";
     constexpr auto outputFilterParameterId = "outputFilterHz";
 }
@@ -20,6 +21,7 @@ MemoryBoyProcessor::MemoryBoyProcessor()
     delayMsParameter = parameters.getRawParameterValue (delayMsParameterId);
     feedbackParameter = parameters.getRawParameterValue (feedbackParameterId);
     mixParameter = parameters.getRawParameterValue (mixParameterId);
+    modParameter = parameters.getRawParameterValue (modParameterId);
     inputFilterParameter = parameters.getRawParameterValue (inputFilterParameterId);
     outputFilterParameter = parameters.getRawParameterValue (outputFilterParameterId);
 }
@@ -90,6 +92,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout MemoryBoyProcessor::createPa
         0.35f));
 
     layout.add (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { modParameterId, 1 },
+        "Mod",
+        juce::NormalisableRange<float> { 0.0f, 100.0f, 0.1f, 2.0f },
+        0.0f));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { inputFilterParameterId, 1 },
         "Input Filter",
         juce::NormalisableRange<float> { 200.0f, 20000.0f, 1.0f, 0.35f },
@@ -114,6 +122,7 @@ void MemoryBoyProcessor::updateProcessingParameters()
         return;
 
     const auto delayMs = delayMsParameter != nullptr ? delayMsParameter->load() : 350.0f;
+    const auto modAmount = modParameter != nullptr ? modParameter->load() * 0.01f : 0.0f;
     const auto inputFilterHz = inputFilterParameter != nullptr
                                    ? inputFilterParameter->load()
                                    : MarsDSP::DSP::BBDFilterSpec::inputFilterOriginalCutoff;
@@ -122,8 +131,26 @@ void MemoryBoyProcessor::updateProcessingParameters()
                                     : MarsDSP::DSP::BBDFilterSpec::outputFilterOriginalCutoff;
 
     brigadeDelay.setDelay (delayMs * 0.001f * sampleRate);
+    brigadeDelay.setTapModulation (juce::jlimit (0.0f, 1.0f, modAmount));
     brigadeDelay.setInputFilterFreq (inputFilterHz);
     brigadeDelay.setOutputFilterFreq (outputFilterHz);
+}
+
+void MemoryBoyProcessor::prepareProcessingState (double sampleRate, int samplesPerBlock, juce::uint32 numChannels)
+{
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32> (juce::jmax (samplesPerBlock, 1));
+    spec.numChannels = juce::jmax<juce::uint32> (numChannels, 2u);
+
+    brigadeDelay.prepare (spec);
+    brigadeDelay.reset();
+
+    feedbackSamples.assign (static_cast<size_t> (spec.numChannels), 0.0f);
+    preparedBlockSize = static_cast<int> (spec.maximumBlockSize);
+    preparedNumChannels = spec.numChannels;
+
+    updateProcessingParameters();
 }
 
 int MemoryBoyProcessor::getNumPrograms()
@@ -156,22 +183,17 @@ void MemoryBoyProcessor::changeProgramName (int index, const juce::String& newNa
 //==============================================================================
 void MemoryBoyProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    juce::dsp::ProcessSpec spec;
-    spec.sampleRate = sampleRate;
-    spec.maximumBlockSize = static_cast<juce::uint32> (samplesPerBlock);
-    spec.numChannels = static_cast<juce::uint32> (juce::jmax (getTotalNumInputChannels(), getTotalNumOutputChannels()));
-
-    brigadeDelay.prepare (spec);
-    brigadeDelay.reset();
-
-    feedbackSamples.assign (static_cast<size_t> (spec.numChannels), 0.0f);
-    updateProcessingParameters();
+    prepareProcessingState (sampleRate,
+                            samplesPerBlock,
+                            static_cast<juce::uint32> (juce::jmax (getTotalNumInputChannels(), getTotalNumOutputChannels())));
 }
 
 void MemoryBoyProcessor::releaseResources()
 {
     feedbackSamples.clear();
     brigadeDelay.free();
+    preparedBlockSize = 0;
+    preparedNumChannels = 0;
 }
 
 bool MemoryBoyProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -180,17 +202,11 @@ bool MemoryBoyProcessor::isBusesLayoutSupported (const BusesLayout& layouts) con
     juce::ignoreUnused (layouts);
     return true;
   #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    // Some plugin hosts, such as certain GarageBand versions, will only
-    // load plugins that support stereo bus layouts.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
-    // This checks if the input layout matches the output layout
    #if ! JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+    if (layouts.getMainInputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
    #endif
 
@@ -206,17 +222,27 @@ void MemoryBoyProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     const auto totalNumInputChannels = getTotalNumInputChannels();
     const auto totalNumOutputChannels = getTotalNumOutputChannels();
+    const auto bufferNumChannels = buffer.getNumChannels();
+
+    if (buffer.getNumSamples() == 0 || bufferNumChannels == 0 || totalNumInputChannels == 0)
+        return;
+
+    if (preparedNumChannels < static_cast<juce::uint32> (bufferNumChannels)
+        || buffer.getNumSamples() > preparedBlockSize)
+    {
+        prepareProcessingState (getSampleRate(),
+                                buffer.getNumSamples(),
+                                static_cast<juce::uint32> (bufferNumChannels));
+    }
 
     for (auto channel = totalNumInputChannels; channel < totalNumOutputChannels; ++channel)
         buffer.clear (channel, 0, buffer.getNumSamples());
-
-    if (buffer.getNumSamples() == 0 || totalNumInputChannels == 0)
-        return;
 
     if (feedbackSamples.size() != static_cast<size_t> (totalNumInputChannels))
         feedbackSamples.assign (static_cast<size_t> (totalNumInputChannels), 0.0f);
 
     updateProcessingParameters();
+    brigadeDelay.prepareModulationBlock (buffer.getNumSamples());
 
     const auto feedback = juce::jlimit (0.0f, 0.95f, feedbackParameter != nullptr ? feedbackParameter->load() : 0.35f);
     const auto mix = juce::jlimit (0.0f, 1.0f, mixParameter != nullptr ? mixParameter->load() : 0.35f);

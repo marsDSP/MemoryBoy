@@ -43,6 +43,17 @@ namespace MarsDSP::DSP
 
         [[nodiscard]] float getDelay() const final { return delaySamp; }
 
+        void setTapModulation(float newAmount)
+        {
+            tapModulationAmount = juce::jlimit(0.0f, 1.0f, newAmount);
+        }
+
+        void prepareModulationBlock(int numSamples)
+        {
+            for (auto &line: lines)
+                line.prepareModulationBlock(tapModulationAmount, numSamples);
+        }
+
         void prepare(const dsp::ProcessSpec &spec) final
         {
             sampleRate = static_cast<float>(spec.sampleRate);
@@ -52,7 +63,7 @@ namespace MarsDSP::DSP
             for (size_t ch = 0; ch < spec.numChannels; ++ch)
             {
                 lines.emplace_back();
-                lines[ch].prepare(sampleRate);
+                lines[ch].prepare(sampleRate, spec.maximumBlockSize);
                 lines[ch].setInputFilterFreq();
                 lines[ch].setOutputFilterFreq();
             }
@@ -92,8 +103,9 @@ namespace MarsDSP::DSP
 
         float delaySamp = 1.0f;
         float sampleRate = 48000.0f;
+        float tapModulationAmount = 0.0f;
 
-        std::vector<BucketBrigade<STAGES, ALIEN> > lines;
+        std::deque<BucketBrigade<STAGES, ALIEN> > lines;
         std::vector<float> inputs;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BBDWrapper)

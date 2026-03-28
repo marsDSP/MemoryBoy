@@ -2,6 +2,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "dsp/brigade_wrapper.h"
+
 //==============================================================================
 class MemoryBoyProcessor final : public juce::AudioProcessor
 {
@@ -43,6 +45,19 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void updateProcessingParameters();
+
     //==============================================================================
+    juce::AudioProcessorValueTreeState parameters;
+    MarsDSP::DSP::BBDWrapper<4096> brigadeDelay;
+    std::vector<float> feedbackSamples;
+
+    std::atomic<float>* delayMsParameter = nullptr;
+    std::atomic<float>* feedbackParameter = nullptr;
+    std::atomic<float>* mixParameter = nullptr;
+    std::atomic<float>* inputFilterParameter = nullptr;
+    std::atomic<float>* outputFilterParameter = nullptr;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MemoryBoyProcessor)
 };

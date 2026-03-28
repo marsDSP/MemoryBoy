@@ -1,12 +1,27 @@
 #include "MemoryBoyProcessor.h"
-#include "MemoryBoyEditor.h"
+
+namespace
+{
+    constexpr auto stateId = "PARAMETERS";
+    constexpr auto delayMsParameterId = "delayMs";
+    constexpr auto feedbackParameterId = "feedback";
+    constexpr auto mixParameterId = "mix";
+    constexpr auto inputFilterParameterId = "inputFilterHz";
+    constexpr auto outputFilterParameterId = "outputFilterHz";
+}
 
 //==============================================================================
 MemoryBoyProcessor::MemoryBoyProcessor()
      : AudioProcessor (BusesProperties()
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
+                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+       parameters (*this, nullptr, stateId, createParameterLayout())
 {
+    delayMsParameter = parameters.getRawParameterValue (delayMsParameterId);
+    feedbackParameter = parameters.getRawParameterValue (feedbackParameterId);
+    mixParameter = parameters.getRawParameterValue (mixParameterId);
+    inputFilterParameter = parameters.getRawParameterValue (inputFilterParameterId);
+    outputFilterParameter = parameters.getRawParameterValue (outputFilterParameterId);
 }
 
 MemoryBoyProcessor::~MemoryBoyProcessor()
@@ -48,7 +63,67 @@ bool MemoryBoyProcessor::isMidiEffect() const
 
 double MemoryBoyProcessor::getTailLengthSeconds() const
 {
-    return 0.0;
+    return 2.0;
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout MemoryBoyProcessor::createParameterLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { delayMsParameterId, 1 },
+        "Delay",
+        juce::NormalisableRange<float> { 1.0f, 2000.0f, 1.0f, 0.4f },
+        350.0f,
+        "ms"));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { feedbackParameterId, 1 },
+        "Feedback",
+        juce::NormalisableRange<float> { 0.0f, 0.95f, 0.01f },
+        0.35f));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { mixParameterId, 1 },
+        "Mix",
+        juce::NormalisableRange<float> { 0.0f, 1.0f, 0.01f },
+        0.35f));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { inputFilterParameterId, 1 },
+        "Input Filter",
+        juce::NormalisableRange<float> { 200.0f, 20000.0f, 1.0f, 0.35f },
+        MarsDSP::DSP::BBDFilterSpec::inputFilterOriginalCutoff,
+        "Hz"));
+
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { outputFilterParameterId, 1 },
+        "Output Filter",
+        juce::NormalisableRange<float> { 200.0f, 20000.0f, 1.0f, 0.35f },
+        MarsDSP::DSP::BBDFilterSpec::outputFilterOriginalCutoff,
+        "Hz"));
+
+    return layout;
+}
+
+void MemoryBoyProcessor::updateProcessingParameters()
+{
+    const auto sampleRate = static_cast<float> (getSampleRate());
+
+    if (sampleRate <= 0.0f)
+        return;
+
+    const auto delayMs = delayMsParameter != nullptr ? delayMsParameter->load() : 350.0f;
+    const auto inputFilterHz = inputFilterParameter != nullptr
+                                   ? inputFilterParameter->load()
+                                   : MarsDSP::DSP::BBDFilterSpec::inputFilterOriginalCutoff;
+    const auto outputFilterHz = outputFilterParameter != nullptr
+                                    ? outputFilterParameter->load()
+                                    : MarsDSP::DSP::BBDFilterSpec::outputFilterOriginalCutoff;
+
+    brigadeDelay.setDelay (delayMs * 0.001f * sampleRate);
+    brigadeDelay.setInputFilterFreq (inputFilterHz);
+    brigadeDelay.setOutputFilterFreq (outputFilterHz);
 }
 
 int MemoryBoyProcessor::getNumPrograms()
@@ -81,15 +156,22 @@ void MemoryBoyProcessor::changeProgramName (int index, const juce::String& newNa
 //==============================================================================
 void MemoryBoyProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = static_cast<juce::uint32> (samplesPerBlock);
+    spec.numChannels = static_cast<juce::uint32> (juce::jmax (getTotalNumInputChannels(), getTotalNumOutputChannels()));
+
+    brigadeDelay.prepare (spec);
+    brigadeDelay.reset();
+
+    feedbackSamples.assign (static_cast<size_t> (spec.numChannels), 0.0f);
+    updateProcessingParameters();
 }
 
 void MemoryBoyProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
+    feedbackSamples.clear();
+    brigadeDelay.free();
 }
 
 bool MemoryBoyProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -119,8 +201,43 @@ bool MemoryBoyProcessor::isBusesLayoutSupported (const BusesLayout& layouts) con
 void MemoryBoyProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                        juce::MidiBuffer& midiMessages)
 {
-    juce::ignoreUnused (buffer, midiMessages);
+    juce::ignoreUnused (midiMessages);
     juce::ScopedNoDenormals noDenormals;
+
+    const auto totalNumInputChannels = getTotalNumInputChannels();
+    const auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    for (auto channel = totalNumInputChannels; channel < totalNumOutputChannels; ++channel)
+        buffer.clear (channel, 0, buffer.getNumSamples());
+
+    if (buffer.getNumSamples() == 0 || totalNumInputChannels == 0)
+        return;
+
+    if (feedbackSamples.size() != static_cast<size_t> (totalNumInputChannels))
+        feedbackSamples.assign (static_cast<size_t> (totalNumInputChannels), 0.0f);
+
+    updateProcessingParameters();
+
+    const auto feedback = juce::jlimit (0.0f, 0.95f, feedbackParameter != nullptr ? feedbackParameter->load() : 0.35f);
+    const auto mix = juce::jlimit (0.0f, 1.0f, mixParameter != nullptr ? mixParameter->load() : 0.35f);
+
+    for (auto channel = 0; channel < totalNumInputChannels; ++channel)
+    {
+        auto* channelData = buffer.getWritePointer (channel);
+        auto delayedSample = feedbackSamples[static_cast<size_t> (channel)];
+
+        for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
+        {
+            const auto drySample = channelData[sample];
+
+            brigadeDelay.pushSample (channel, drySample + delayedSample * feedback);
+            delayedSample = brigadeDelay.popSample (channel);
+
+            channelData[sample] = drySample * (1.0f - mix) + delayedSample * mix;
+        }
+
+        feedbackSamples[static_cast<size_t> (channel)] = delayedSample;
+    }
 }
 
 //==============================================================================
@@ -131,23 +248,24 @@ bool MemoryBoyProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* MemoryBoyProcessor::createEditor()
 {
-    return new MemoryBoyEditor (*this);
+    return new juce::GenericAudioProcessorEditor (*this);
 }
 
 //==============================================================================
 void MemoryBoyProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
-    juce::ignoreUnused (destData);
+    if (auto stateXml = parameters.copyState().createXml())
+        copyXmlToBinary (*stateXml, destData);
 }
 
 void MemoryBoyProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
-    juce::ignoreUnused (data, sizeInBytes);
+    if (const auto stateXml = getXmlFromBinary (data, sizeInBytes);
+        stateXml != nullptr && stateXml->hasTagName (parameters.state.getType()))
+    {
+        parameters.replaceState (juce::ValueTree::fromXml (*stateXml));
+        updateProcessingParameters();
+    }
 }
 
 //==============================================================================

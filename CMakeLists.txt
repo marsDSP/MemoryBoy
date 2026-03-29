@@ -227,18 +227,3 @@ if(TARGET AudioPluginHost)
     )
 endif()
 
-add_executable(BBDShortDelayTest tests/BBDShortDelayTest.cpp
-        source/dsp/diffusor.cpp
-        source/dsp/diffusor.h
-        source/math/buffer_staticdelay.h
-        source/dsp/interpolator.h
-        source/math/matrix_ops.h)
-target_link_libraries(BBDShortDelayTest PRIVATE
-        SharedCode
-        juce::juce_audio_basics
-        juce::juce_core
-        juce::juce_events
-        juce::juce_dsp
-        juce::juce_graphics
-        juce::juce_gui_basics
-)

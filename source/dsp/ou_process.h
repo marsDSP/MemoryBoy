@@ -25,7 +25,7 @@ namespace MarsDSP::DSP
                 sampleRate, static_cast<juce::uint32>(samplesPerBlock), 1
             };
 
-            noiseGen.setNoiseType(noise<float>::Normal);
+            noiseGen.setNoiseType(noise<float>::Uniform);
             noiseGen.setGainLinear(1.0f / 2.33f);
             noiseGen.prepare(monoSpec);
 

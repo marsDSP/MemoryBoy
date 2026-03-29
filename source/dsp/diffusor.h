@@ -206,7 +206,7 @@ public:
     }
 
     /** Processes a set of channels */
-    inline const FloatType* process (const FloatType* data) noexcept
+    const FloatType* process (const FloatType* data) noexcept
     {
         const FloatType* outData = data;
         for (auto& stage : stages)

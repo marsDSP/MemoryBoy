@@ -12,7 +12,6 @@ namespace MarsDSP::Buffers
 {
     namespace DelayLineInterpolationTypes
     {
-
         struct None
         {
             template <typename T>
@@ -21,12 +20,11 @@ namespace MarsDSP::Buffers
             }
 
             template <typename SampleType, typename NumericType = Utils::SampleTypeHelpers::NumericType<SampleType>, typename StorageType = SampleType>
-            inline SampleType call (const SampleType* buffer, int delayInt, NumericType  = {}, const SampleType&  = {})
+            SampleType call (const SampleType* buffer, int delayInt, NumericType  = {}, const SampleType&  = {})
             {
                 return static_cast<SampleType> (buffer[delayInt]);
             }
         };
-
 
         struct Linear
         {
@@ -36,7 +34,7 @@ namespace MarsDSP::Buffers
             }
 
             template <typename SampleType, typename NumericType, typename StorageType = SampleType>
-            inline SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
+            SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
             {
                 auto index1 = delayInt;
                 auto index2 = index1 + 1;
@@ -47,7 +45,6 @@ namespace MarsDSP::Buffers
                 return value1 + static_cast<SampleType>(delayFrac) * (value2 - value1);
             }
         };
-
 
         struct Lagrange3rd
         {
@@ -62,7 +59,7 @@ namespace MarsDSP::Buffers
             }
 
             template <typename SampleType, typename NumericType, typename StorageType = SampleType>
-            inline SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
+            SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
             {
                 auto index1 = delayInt;
                 auto index2 = index1 + 1;
@@ -87,7 +84,6 @@ namespace MarsDSP::Buffers
             }
         };
 
-
         struct Lagrange5th
         {
             template <typename T>
@@ -101,7 +97,7 @@ namespace MarsDSP::Buffers
             }
 
             template <typename SampleType, typename NumericType, typename StorageType = SampleType>
-            inline SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
+            SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
             {
                 auto index1 = delayInt;
                 auto index2 = index1 + 1;
@@ -134,7 +130,6 @@ namespace MarsDSP::Buffers
             }
         };
 
-
         struct Thiran
         {
             template <typename T>
@@ -150,7 +145,7 @@ namespace MarsDSP::Buffers
             }
 
             template <typename T1, typename T2>
-            inline T1 call (const T1* buffer, int delayInt, T2 , T1& state)
+            T1 call (const T1* buffer, int delayInt, T2 , T1& state)
             {
                 auto index1 = delayInt;
                 auto index2 = index1 + 1;
@@ -170,7 +165,6 @@ namespace MarsDSP::Buffers
 #ifndef DOXYGEN
         JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4324)
     #endif
-
 
         template <typename T, size_t N, size_t M = 256>
         struct Sinc
@@ -194,22 +188,22 @@ namespace MarsDSP::Buffers
                 }
             }
 
-            inline T sincf (T x) const noexcept
+            T sincf (T x) const noexcept
             {
                 if (x == static_cast<T> (0))
                     return static_cast<T> (1);
-                return (std::sin (juce::MathConstants<T>::pi * x)) / (juce::MathConstants<T>::pi * x);
+                return (std::sin (MathConstants<T>::pi * x)) / (MathConstants<T>::pi * x);
             }
 
-            inline T symmetric_blackman (T i, int n) const noexcept
+            T symmetric_blackman (T i, int n) const noexcept
             {
                 i -= static_cast<T> (n / 2);
-                return (static_cast<T> (0.42) - static_cast<T> (0.5) * std::cos (juce::MathConstants<T>::twoPi * i / static_cast<T> (n))
-                        + static_cast<T> (0.08) * std::cos (4 * juce::MathConstants<T>::pi * i / static_cast<T> (n)));
+                return (static_cast<T> (0.42) - static_cast<T> (0.5) * std::cos (MathConstants<T>::twoPi * i / static_cast<T> (n))
+                        + static_cast<T> (0.08) * std::cos (4 * MathConstants<T>::pi * i / static_cast<T> (n)));
             }
 
             template <typename SampleType, typename NumericType = SampleType, typename StorageType = SampleType>
-            inline SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
+            SampleType call (const StorageType* buffer, int delayInt, NumericType delayFrac, const SampleType&  = {})
             {
                 const auto sincTableOffset = static_cast<size_t> ((static_cast<T> (1) - static_cast<T> (delayFrac)) * static_cast<T> (M)) * N * 2;
 

@@ -113,7 +113,9 @@ add_library(SharedCode INTERFACE
         source/dsp/brigade_delayline.h
         source/dsp/brigade_wrapper.h
         source/dsp/ou_process.h
-        source/dsp/noise.h)
+        source/dsp/noise.h
+        source/math/lanczos_resampler.h
+        source/math/base_resampler.h)
 
 # Set compile features for SharedCode
 target_compile_features(SharedCode INTERFACE cxx_std_23)

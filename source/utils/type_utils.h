@@ -53,5 +53,4 @@ inline SampleTypeHelpers
     inline constexpr bool IsSIMDRegister = false;
 #endif
 }
-
 #endif //MEMORYBOY_TYPE_UTILS_H

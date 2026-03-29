@@ -254,11 +254,11 @@ void MemoryBoyProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     updateProcessingParameters();
     brigadeDelay.prepareModulationBlock (buffer.getNumSamples());
 
-    const auto feedback = juce::jlimit (0.0f, 0.95f, feedbackParameter != nullptr ? feedbackParameter->load() : 0.35f);
-    const auto mix = juce::jlimit (0.0f, 1.0f, mixParameter != nullptr ? mixParameter->load() : 0.35f);
+    const auto feedback = jlimit (0.0f, 0.95f, feedbackParameter != nullptr ? feedbackParameter->load() : 0.35f);
+    const auto mix = jlimit (0.0f, 1.0f, mixParameter != nullptr ? mixParameter->load() : 0.35f);
 
     std::vector<float*> channelData (static_cast<size_t> (totalNumInputChannels), nullptr);
-    std::vector<float> inputFrame (static_cast<size_t> (totalNumInputChannels), 0.0f);
+    std::vector inputFrame (static_cast<size_t> (totalNumInputChannels), 0.0f);
 
     for (auto channel = 0; channel < totalNumInputChannels; ++channel)
         channelData[static_cast<size_t> (channel)] = buffer.getWritePointer (channel);
@@ -293,7 +293,7 @@ bool MemoryBoyProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* MemoryBoyProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor (*this);
+    return new GenericAudioProcessorEditor (*this);
 }
 
 //==============================================================================

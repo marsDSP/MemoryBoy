@@ -2,5 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libs/JUCE" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libs/gcem" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libs/xsimd" vcs="Git" />
   </component>
 </project>

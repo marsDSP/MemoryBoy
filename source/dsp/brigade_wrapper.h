@@ -44,16 +44,19 @@ namespace MarsDSP::DSP
                 line.setDelayTime(delaySec);
         }
 
-        [[nodiscard]] float getDelay() const final { return delaySamp; }
+        [[nodiscard]] float getDelay() const final
+        {
+            return delaySamp;
+        }
 
         void setTapModulation(float newAmount)
         {
-            tapModulationAmount = juce::jlimit(0.0f, 1.0f, newAmount);
+            tapModulationAmount = jlimit(0.0f, 1.0f, newAmount);
         }
 
         void setDiffusor(float newAmount)
         {
-            diffusorAmount = juce::jlimit(0.0f, 1.0f, newAmount);
+            diffusorAmount = jlimit(0.0f, 1.0f, newAmount);
             updateDiffuserSettings();
         }
 
@@ -85,7 +88,7 @@ namespace MarsDSP::DSP
                 if (stereoDiffuser == nullptr)
                     stereoDiffuser = std::make_unique<StereoDiffuser>();
 
-                stereoDiffuser->template prepare<DiffuserChainHalfConfig>(spec.sampleRate);
+                stereoDiffuser->prepare<DiffuserChainEqualConfig>(spec.sampleRate);
                 stereoDiffuser->reset();
                 updateDiffuserSettings();
             }
@@ -116,7 +119,7 @@ namespace MarsDSP::DSP
 
         const std::vector<float>& processFrame(const float* frameData, int numChannels) noexcept
         {
-            const auto channelsToProcess = juce::jmin(numChannels, static_cast<int>(lines.size()));
+            const auto channelsToProcess = jmin(numChannels, static_cast<int>(lines.size()));
             jassert(channelsToProcess >= 0);
 
             if (channelsToProcess >= 2 && diffusorAmount > 0.0f && stereoDiffuserPrepared)
@@ -125,8 +128,8 @@ namespace MarsDSP::DSP
                 stereoFrame[1] = frameData[1];
 
                 const auto* diffusedFrame = stereoDiffuser->process(stereoFrame.data());
-                processedInputs[0] = juce::jmap(diffusorAmount, frameData[0], diffusedFrame[0]);
-                processedInputs[1] = juce::jmap(diffusorAmount, frameData[1], diffusedFrame[1]);
+                processedInputs[0] = jmap(diffusorAmount, frameData[0], diffusedFrame[0]);
+                processedInputs[1] = jmap(diffusorAmount, frameData[1], diffusedFrame[1]);
             }
 
             for (int channel = 0; channel < channelsToProcess; ++channel)

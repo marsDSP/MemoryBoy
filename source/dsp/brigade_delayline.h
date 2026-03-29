@@ -15,10 +15,10 @@ namespace MarsDSP::DSP
     {
     public:
         BucketBrigade() = default;
-        BucketBrigade(BucketBrigade &&) noexcept = default;
-        BucketBrigade &operator=(BucketBrigade &&) noexcept = default;
+        BucketBrigade(BucketBrigade&&) noexcept = default;
+        BucketBrigade &operator=(BucketBrigade&&) noexcept = default;
 
-        void prepare(double sampleRate, juce::uint32 maximumBlockSize)
+        void prepare(double sampleRate, uint32 maximumBlockSize)
         {
             FS = static_cast<float>(sampleRate);
             Ts = 1.0f / FS;
@@ -30,7 +30,7 @@ namespace MarsDSP::DSP
             outputFilter = std::make_unique<OutputFilterBank>(Ts);
             H0 = outputFilter->calcH0();
 
-            tapDrift.prepare(sampleRate, static_cast<int>(juce::jmax<juce::uint32>(maximumBlockSize, 1u)), 1);
+            tapDrift.prepare(sampleRate, static_cast<int>(juce::jmax<uint32>(maximumBlockSize, 1u)), 1);
             tapDrift.prepareBlock(0.0f, 1);
             modulationSampleIndex = 0;
 
@@ -62,20 +62,20 @@ namespace MarsDSP::DSP
 
         void setDelayTime(float delaySec) noexcept
         {
-            baseDelaySec = juce::jmax(Ts, delaySec - Ts);
+            baseDelaySec = jmax(Ts, delaySec - Ts);
             updateClockDelta(baseDelaySec);
         }
 
         void prepareModulationBlock(float amount, int numSamples)
         {
-            modulationAmount = juce::jlimit(0.0f, 1.0f, amount);
+            modulationAmount = jlimit(0.0f, 1.0f, amount);
             modulationSampleIndex = 0;
-            tapDrift.prepareBlock(modulationAmount, juce::jmax(numSamples, 1));
+            tapDrift.prepareBlock(modulationAmount, jmax(numSamples, 1));
         }
 
         void setDiffusor(float newAmount) noexcept
         {
-            diffusorAmount = juce::jlimit(0.0f, 1.0f, newAmount);
+            diffusorAmount = jlimit(0.0f, 1.0f, newAmount);
             tapDrift.setMeanReversion(diffusorAmount);
         }
 
@@ -85,7 +85,7 @@ namespace MarsDSP::DSP
         {
             ScopedNoDenormals noDenormals;
             applyTapModulation();
-            SIMDComplex<float> xOutAccum;
+            SIMDComplex<float> xOutAccum{};
             float yBBD, delta;
             int iterations = 0;
             while (tn < 1.0f)
@@ -94,8 +94,7 @@ namespace MarsDSP::DSP
                 if (evenOn)
                 {
                     inputFilter->calcG();
-                    buffer[bufferPtr++] = xsimd::reduce_add(
-                        SIMD::SIMDComplexMulReal(inputFilter->Gcalc, inputFilter->x));
+                    buffer[bufferPtr++] = xsimd::reduce_add(SIMD::SIMDComplexMulReal(inputFilter->Gcalc, inputFilter->x));
                     bufferPtr = (bufferPtr <= STAGES) ? bufferPtr : 0;
                 } else
                 {
@@ -113,7 +112,7 @@ namespace MarsDSP::DSP
 
             inputFilter->process(u);
             outputFilter->process(xOutAccum);
-            float sumOut = xsimd::reduce_add(xOutAccum.real());
+            float sumOut = xsimd::reduce_add(outputFilter->x.real());
             return H0 * yBBD_old + sumOut;
         }
 
@@ -132,8 +131,7 @@ namespace MarsDSP::DSP
                 if (evenOn)
                 {
                     inputFilter->calcG();
-                    buffer[bufferPtr++] = xsimd::reduce_add(
-                        SIMD::SIMDComplexMulReal(inputFilter->Gcalc, inputFilter->x));
+                    buffer[bufferPtr++] = xsimd::reduce_add(SIMD::SIMDComplexMulReal(inputFilter->Gcalc, inputFilter->x));
                     bufferPtr = (bufferPtr <= STAGES) ? bufferPtr : 0;
                 } else
                 {
@@ -151,16 +149,32 @@ namespace MarsDSP::DSP
 
             inputFilter->process(u);
             outputFilter->process(xOutAccum);
-            float sumOut = xsimd::reduce_add(xOutAccum.real());
+            float sumOut = xsimd::reduce_add(outputFilter->x.real());
             return H0 * yBBD_old + sumOut;
         }
 
     private:
+        /*void updateClockDelta(float delaySec) noexcept
+        {
+            const auto clockRateHz = (2.0f * static_cast<float>(STAGES)) / jmax(delaySec, Ts);
+            Ts_bbd = 1.0f / clockRateHz;
+            Ts_bbd = jmax(Ts * 0.01f, Ts_bbd);
+
+            const auto doubleTs = 2.0f * Ts_bbd;
+            inputFilter->set_delta(doubleTs);
+            outputFilter->set_delta(doubleTs);
+        }*/
+
         void updateClockDelta(float delaySec) noexcept
         {
-            const auto clockRateHz = (2.0f * static_cast<float>(STAGES)) / juce::jmax(delaySec, Ts);
-            Ts_bbd = 1.0f / clockRateHz;
-            Ts_bbd = juce::jmax(Ts * 0.01f, Ts_bbd);
+            const auto clockRateHz = (2.0f * static_cast<float>(STAGES)) / jmax(delaySec, Ts);
+
+            // important -- this is a hot eqn
+            Ts_bbd = 1.0 / clockRateHz;
+
+            const auto minTsBbd = Ts * 0.01f;
+            const auto maxTsBbd = Ts * 5.0f; // tune this upper bound by ear
+            Ts_bbd = jlimit(minTsBbd, maxTsBbd, Ts_bbd);
 
             const auto doubleTs = 2.0f * Ts_bbd;
             inputFilter->set_delta(doubleTs);
@@ -174,10 +188,9 @@ namespace MarsDSP::DSP
 
             constexpr auto maxDelayDrift = 0.12f;
 
+            // check if we really actually want the value back here
             const auto drift = tapDrift.process(modulationSampleIndex++, 0);
-            const auto driftRatio = juce::jlimit(0.8f,
-                                                 1.2f,
-                                                 1.0f + drift * maxDelayDrift);
+            const auto driftRatio = jlimit(0.8f, 1.2f, 1.0f + drift * maxDelayDrift);
             updateClockDelta(baseDelaySec * driftRatio);
         }
 
